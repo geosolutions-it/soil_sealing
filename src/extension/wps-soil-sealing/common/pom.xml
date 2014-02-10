@@ -26,6 +26,22 @@
 			<artifactId>wps-core</artifactId>
 			<version>${gs.version}</version>
 		</dependency>
+		<!-- JAI-EXT dependencies -->
+		<dependency>
+			<groupId>it.geosolutions-jai-ext</groupId>
+			<artifactId>change-matrix</artifactId>
+			<version>${jai-ext.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>it.geosolutions.jaiext.zonal</groupId>
+			<artifactId>jt-zonal</artifactId>
+			<version>${jai-ext.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>it.geosolutions.jaiext.bandmerge</groupId>
+			<artifactId>jt-bandmerge</artifactId>
+			<version>${jai-ext.version}</version>
+		</dependency>
 
         <!-- test dependencies -->
         <dependency>

@@ -1493,6 +1493,7 @@
   <javac.maxHeapSize>256m</javac.maxHeapSize>
   <image.tests>true</image.tests>
   <interactive.tests>false</interactive.tests>
+  <jai-ext.version>1.0-SNAPSHOT</jai-ext.version>
  </properties>
 
  <profiles>
