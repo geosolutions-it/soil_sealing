@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.geoserver</groupId>
+        <artifactId>extension</artifactId>
+        <version>2.5-SOIL_SEALING-SNAPSHOT</version>
+    </parent>
+
+    <groupId>org.geoserver.extension</groupId>
+    <artifactId>wps-soil-sealing</artifactId>
+    <packaging>pom</packaging>
+    <name>Web Processing Service Soil Sealing extension</name>    
+
+    <properties>
+    </properties>
+
+    <!-- =========================================================== -->
+    <!--     Dependency Management                                   -->
+    <!--     If a POM declares one of those dependencies, then it    -->
+    <!--     will use the version specified here. Otherwise, those   -->
+    <!--     dependencies are ignored.                               -->
+    <!-- =========================================================== -->
+    <dependencyManagement>
+	  <dependencies>
+        <dependency>
+           <groupId>org.geoserver</groupId>
+           <artifactId>main</artifactId>
+           <version>${gs.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.geoserver.extension</groupId>
+            <artifactId>wps-core</artifactId>
+            <version>${gs.version}</version>
+        </dependency>
+		
+		<dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-process</artifactId>
+            <version>${gt.version}</version>
+        </dependency>
+
+		<dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-process-raster</artifactId>
+            <version>${gt.version}</version>
+        </dependency>
+
+                
+        <!-- test dependencies -->
+        <!-- dependency>
+          <groupId>xmlunit</groupId>
+          <artifactId>xmlunit</artifactId>
+          <scope>test</scope>
+        </dependency -->
+        <!-- dependency>
+          <groupId>com.mockrunner</groupId>
+          <artifactId>mockrunner</artifactId>
+          <scope>test</scope>
+        </dependency -->
+        <dependency>
+           <groupId>org.geoserver</groupId>
+           <artifactId>main</artifactId>
+           <version>${gs.version}</version>
+           <classifier>tests</classifier>
+           <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.geoserver.extension</groupId>
+            <artifactId>wps-core</artifactId>
+            <version>${gs.version}</version>
+            <classifier>tests</classifier>
+            <scope>test</scope>
+        </dependency>
+	  </dependencies>
+    </dependencyManagement>
+	
+    <repositories>
+    	<!-- GeoSolutions -->
+        <repository>
+            <id>geosolutions</id>
+            <name>GeoSolutions Repository</name>
+            <url>http://maven.geo-solutions.it</url>
+        </repository>
+
+		<!-- Hibernate Spatial -->
+        <repository>
+            <id>Hibernate Spatial repo</id>
+            <url>http://www.hibernatespatial.org/repository</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+	</repositories>
+
+  <modules>
+	<module>common</module>
+	<!-- module>change-matrix</module>
+	<module>soil-sealing</module -->
+  </modules>
+
+  <profiles>
+
+    <!-- profiles for individual modules -->
+
+  </profiles>
+
+</project>
