@@ -2,12 +2,14 @@ package org.geoserver.extension;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -19,18 +21,26 @@ import org.geotools.data.FeatureSource;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
+import org.geotools.geometry.jts.JTS;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.process.gs.GSProcess;
+import org.geotools.referencing.CRS;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory2;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
 
 import com.google.common.util.concurrent.AtomicDouble;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.Point;
 
 public class UrbanGridProcess implements GSProcess {
+
+	public static final String IMP_2006_SHP = "imp_2006.shp";
+	
+	public static final String IMP_2009_SHP = "imp_2009.shp";
 
 	public static final int FIFTH_INDEX = 5;
 
@@ -44,8 +54,25 @@ public class UrbanGridProcess implements GSProcess {
 
 	public static final int TENTH_INDEX = 10;
 
+	public static final String PROJ_HEADER = "PROJCS[\"Local area projection/ LOCAL_AREA_PROJECTION\",";
+
+	public static final String PROJ_FOOTER = ",PROJECTION[\"Lambert Azimuthal Equal Area\", AUTHORITY[\"EPSG\",\"9820\"]],"
+			+ "PARAMETER[\"latitude_of_center\", %LAT0%], PARAMETER[\"longitude_of_center\", %LON0%],"
+			+ "PARAMETER[\"false_easting\", 0.0], PARAMETER[\"false_northing\", 0.0],"
+			+ "UNIT[\"m\", 1.0], AXIS[\"Northing\", NORTH], AXIS[\"Easting\", EAST], AUTHORITY[\"EPSG\",\"3035\"]]";
+
+	public static final String GEOGCS_4326 = "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,"
+			+ "AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],"
+			+ "UNIT[\"degree\",0.01745329251994328,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]";
+
+	public static final String PROJ_4326 = PROJ_HEADER + GEOGCS_4326
+			+ PROJ_FOOTER;
+	
+	private CountDownLatch latch;
+
 	// HP to verify
-	// HP1 = admin geometries in Raster space, for index 7a-8-9-10; in UTM Zone 32 for other indexes 
+	// HP1 = admin geometries in Raster space, for index 7a-8-9-10; in UTM Zone
+	// 32 for other indexes
 	// HP2 = Coverages already cropped and transformed to the Raster Space
 
 	@DescribeResult(name = "UrbanGridProcess", description = "Urban Grid indexes", type = List.class)
@@ -62,58 +89,74 @@ public class UrbanGridProcess implements GSProcess {
 
 		// Check on the index 7
 		if (index == SEVENTH_INDEX
-				&& (subId == null || subId.isEmpty() || 
-				!(subId.equalsIgnoreCase("a") 
-					|| subId.equalsIgnoreCase("b") 
-					|| subId.equalsIgnoreCase("c")))) {
+				&& (subId == null || subId.isEmpty() || !(subId
+						.equalsIgnoreCase("a") || subId.equalsIgnoreCase("b") || subId
+							.equalsIgnoreCase("c")))) {
 			throw new IllegalArgumentException("Wrong subindex for index 7");
 		}
 
+		if(referenceCoverage == null && nowCoverage == null){
+			throw new IllegalArgumentException("No input Coverage provided");
+		}
+		
 		// If the index is not 8-9-10 then the input Urban Grids must be loaded
 		// from the shp file.
 		if (index < EIGHTH_INDEX) {
-			
+
 			// If index is 7a raster calculation can be executed
-			if(index == SEVENTH_INDEX && subId.equalsIgnoreCase("a")){
+			if (index == SEVENTH_INDEX && subId.equalsIgnoreCase("a")) {
 				Set<Integer> classes = new TreeSet<Integer>();
 				classes.add(Integer.valueOf(1));
 				return new CLCProcess().execute(referenceCoverage, nowCoverage,
-						classes, CLCProcess.FIRST_INDEX, pixelArea, rois,
-						null, null);
+						classes, CLCProcess.FIRST_INDEX, pixelArea, rois, null,
+						null);
 			}
-			
-			//
-			File file = new File("imp_2006.shp");
-			Map map = new HashMap();
-			map.put("url", file.toURL());
-			DataStore dataStore = DataStoreFinder.getDataStore(map);
-			String typeName = dataStore.getTypeNames()[0];
-			FeatureSource source = dataStore.getFeatureSource(typeName);
-
-			CoordinateReferenceSystem sourceCrs = source.getInfo().getCRS();
-
-			FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
-
-			Filter filter;
 
 			int numThreads = rois.size();
-
-			ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads,
-					numThreads, 60, TimeUnit.SECONDS,
-					new ArrayBlockingQueue<Runnable>(1000000));
-
-			for (Geometry geo : rois) {
-
-				filter = ff.within(ff.property("THE_GEOM"), ff.literal(geo));
-
-				FeatureCollection coll = source.getFeatures(filter);
+			
+			boolean area = false;
+			
+			switch(index){
+			case FIFTH_INDEX:
+				area = true;
+				break;
+			case SIXTH_INDEX:
+				area = false;
+				break;
+			case SEVENTH_INDEX:
+				area = true;
 			}
+			
+			if(referenceCoverage != null){
+				latch = new CountDownLatch(numThreads); 
+				//
+				File file = new File(IMP_2006_SHP);
+				Map map = new HashMap();
+				map.put("url", file.toURL());
+				DataStore dataStore = DataStoreFinder.getDataStore(map);
+				
+				ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads,
+						numThreads, 60, TimeUnit.SECONDS,
+						new ArrayBlockingQueue<Runnable>(1000000));
+
+				for (Geometry geo : rois) {
+					List<Double> areas = new ArrayList<Double>();
+					MyRunnable run = new MyRunnable(geo, dataStore,areas,area);
+					executor.execute(run);
+				}
+			}
+			
+			if(nowCoverage != null){
+				
+			}
+			
+
 
 		} else if (index == EIGHTH_INDEX) {
 			// Raster elaboration
 
 		} else {
-			// Zonal Stats
+			// For the index 9-10 Zonal Stats are calculated
 
 			Set<Integer> classes = new TreeSet<Integer>();
 			classes.add(Integer.valueOf(1));
@@ -135,40 +178,25 @@ public class UrbanGridProcess implements GSProcess {
 		return null;
 
 	}
-	
-	
-	
-	static class MyRunnable implements Runnable{
 
+	class MyRunnable implements Runnable {
 
-		
 		private Geometry geo;
 		private DataStore ds;
-		private AtomicDouble counter;
-		private double[] areas;
-		private boolean update=false;
-		private Boolean perimeter;
+		private List<Double> values;
+		private final boolean area;
 
-
-
-
-		public MyRunnable(Geometry geo, DataStore ds, AtomicDouble counter, Boolean perimeter){
-			this.geo=geo;
-			this.ds=ds;
-			this.counter=counter;
-			this.perimeter=perimeter;
-			
-			if(counter!=null){
-				this.update=true;
-			}
+		public MyRunnable(Geometry geo, DataStore ds, List<Double> values,
+				boolean area) {
+			this.geo = geo;
+			this.ds = ds;
+			this.values=values;
+			this.area=area;
 		}
-		
-		
-		
-		
+
 		@Override
 		public void run() {
-			
+
 			String typeName = null;
 			FeatureSource source = null;
 			try {
@@ -177,51 +205,68 @@ public class UrbanGridProcess implements GSProcess {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-			
-			if(source==null){
-				return;//FIXME SHOULD THROW AN EXCEPTION?
+
+			if (source == null) {
+				return;// FIXME SHOULD THROW AN EXCEPTION?
 			}
-			
-			CoordinateReferenceSystem sourceCrs = source.getInfo().getCRS();
+
+			CoordinateReferenceSystem sourceCRS = source.getInfo().getCRS();
 
 			FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
 
 			Filter filter = ff.within(ff.property("THE_GEOM"), ff.literal(geo));
-			
+
 			FeatureCollection coll = null;
 			try {
 				coll = source.getFeatures(filter);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-			
-			if(coll==null){
-				return;//FIXME SHOULD THROW AN EXCEPTION?
+
+			if (coll == null) {
+				return;// FIXME SHOULD THROW AN EXCEPTION?
 			}
-			
-			Set<Double> values;
-			
-			if(update){
-				values = null;
-			}else{
-				values = new TreeSet<Double>();
-			}
-			
+
 			FeatureIterator iter = coll.features();
+
+			double perimeter = 0;
 			
-			while(iter.hasNext()){
-				SimpleFeature feature = (SimpleFeature) iter.next();
-			    Geometry sourceGeometry = (Geometry) feature.getDefaultGeometry();
+			try {
+				while (iter.hasNext()) {
+					SimpleFeature feature = (SimpleFeature) iter.next();
+					Geometry sourceGeometry = (Geometry) feature
+							.getDefaultGeometry();
+
+					// Reproject to the Lambert Equal Area
+					Point center = sourceGeometry.getCentroid();
+
+					String wkt = PROJ_4326.replace("%LAT0%",
+							String.valueOf(center.getY()));
+					wkt = wkt.replace("%LON0%", String.valueOf(center.getX()));
+
+					final CoordinateReferenceSystem targetCRS = CRS
+							.parseWKT(wkt);
+					
+					MathTransform trans = CRS.findMathTransform(sourceCRS, targetCRS);
+					
+					Geometry geoPrj = JTS.transform(sourceGeometry, trans);
+					
+					if(area){
+						values.add(geoPrj.getArea());
+					}else{
+						perimeter += geoPrj.getLength();
+					}
+				}
+
+				if(!area){
+					values.add(perimeter);
+				}
 				
-			    //Reproject to 
-			    
-			    
-			    
-				
-				
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 			
-			
+			latch.countDown();
 		}
 	}
 }
