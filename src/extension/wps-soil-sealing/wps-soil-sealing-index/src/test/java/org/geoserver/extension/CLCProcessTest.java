@@ -226,7 +226,7 @@ public class CLCProcessTest {
     @Test
     public void testIdx1() {
         List<StatisticContainer> result = new CLCProcess().execute(reference, null, classes, 1,
-                AREA, rois, populations, null);
+                AREA, rois, populations, null, null);
         StatisticContainer container = result.get(0);
 
         double class3 = container.getResultsRef()[0];
@@ -239,7 +239,7 @@ public class CLCProcessTest {
     @Test
     public void testIdx1With2Img() {
         List<StatisticContainer> result = new CLCProcess().execute(reference, now, classes, 1,
-                AREA, rois, populations, null);
+                AREA, rois, populations, null, null);
         StatisticContainer container = result.get(0);
 
         double class3r = container.getResultsRef()[0];
@@ -258,7 +258,7 @@ public class CLCProcessTest {
     @Test
     public void testIdx2() {
         List<StatisticContainer> result = new CLCProcess().execute(reference, now, classes, 2,
-                AREA, rois, populations, null);
+                AREA, rois, populations, null, null);
 
         StatisticContainer container = result.get(0);
 
@@ -272,7 +272,7 @@ public class CLCProcessTest {
     @Test
     public void testIdx3() {
         List<StatisticContainer> result = new CLCProcess().execute(reference, now, classes, 3,
-                AREA, rois, populations, null);
+                AREA, rois, populations, null, null);
 
         StatisticContainer container = result.get(0);
 
@@ -285,7 +285,7 @@ public class CLCProcessTest {
     @Test
     public void testIdx4() {
         List<StatisticContainer> result = new CLCProcess().execute(reference, now, classes, 4,
-                AREA, rois, populations, null);
+                AREA, rois, populations, null, null);
 
         StatisticContainer container = result.get(0);
 
@@ -297,19 +297,19 @@ public class CLCProcessTest {
     @Test(expected = IllegalArgumentException.class)
     public void testNoCoverages() {
         List<StatisticContainer> result = new CLCProcess().execute(null, null, classes, 1, AREA,
-                rois, populations, null);
+                rois, populations, null, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testOnlyOneCoverage() {
         List<StatisticContainer> result = new CLCProcess().execute(reference, null, classes, 4,
-                AREA, rois, populations, null);
+                AREA, rois, populations, null, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testWrongIndex() {
         List<StatisticContainer> result = new CLCProcess().execute(reference, now, classes, 6,
-                AREA, rois, populations, null);
+                AREA, rois, populations, null, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -319,7 +319,7 @@ public class CLCProcessTest {
         list.add(populations.get(0));
 
         List<StatisticContainer> result = new CLCProcess().execute(reference, now, classes, 4,
-                AREA, rois, list, null);
+                AREA, rois, list, null, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -330,7 +330,7 @@ public class CLCProcessTest {
         list.add(new ArrayList<Integer>());
 
         List<StatisticContainer> result = new CLCProcess().execute(reference, now, classes, 4,
-                AREA, rois, list, null);
+                AREA, rois, list, null, null);
     }
 
     @AfterClass

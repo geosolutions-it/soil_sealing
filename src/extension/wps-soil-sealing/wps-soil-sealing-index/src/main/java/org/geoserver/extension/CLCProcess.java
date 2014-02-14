@@ -73,7 +73,8 @@ public class CLCProcess implements GSProcess {
             @DescribeParameter(name = "pixelarea", min = 0, description = "Pixel Area") Double pixelArea,
             @DescribeParameter(name = "rois", min = 1, description = "Administrative Areas") List<Geometry> rois,
             @DescribeParameter(name = "populations", min = 0, description = "Populations for each Area") List<List<Integer>> populations,
-            @DescribeParameter(name = "coeff", min = 0, description = "Coefficient used in the 9-10 indexes calculations") Double coeff) {
+            @DescribeParameter(name = "coeff", min = 0, description = "Coefficient used in the 9-10 indexes calculations") Double coeff,
+            @DescribeParameter(name = "percent", min = 0, description = "Indicator if the first index must be set in percentual") Boolean multiplier) {
 
         // First check on the number of input Coverages for the provided index
         boolean refExists = referenceCoverage != null;
@@ -100,7 +101,11 @@ public class CLCProcess implements GSProcess {
         } else {
             area = pixelArea;
         }
-
+        
+        boolean percentual = false;
+        if(multiplier!=null){
+            percentual = multiplier;
+        }
         // Other check related to the indexes
         switch (index) {
         case FIRST_INDEX:
@@ -189,17 +194,21 @@ public class CLCProcess implements GSProcess {
             // Elaboration for a 2-band image
             if (multiBanded) {
                 for (ZoneGeometry zone : results) {
-                    double[][] coeffCop = calculateCoeffCop(classes, bands, zone, area);
-
-                    // double[] coeffVariation = calculateVariation(numClass, coeffCop);
+                    double[][] coeffCop = calculateCoeffCop(classes, bands, zone, area, percentual);
 
                     Geometry geo = ((ROIGeometry) zone.getROI()).getAsGeometry();
-
-                    container.add(new StatisticContainer(geo, coeffCop[ZERO_IDX], coeffCop[1]));
+                    
+                    if(percentual){
+                        double[] coeffVariation = calculateVariation(numClass, coeffCop);
+                        
+                        container.add(new StatisticContainer(geo, coeffVariation, null));
+                    }else{
+                        container.add(new StatisticContainer(geo, coeffCop[ZERO_IDX], coeffCop[1]));
+                    }
                 }
             } else {
                 for (ZoneGeometry zone : results) {
-                    double[] coeffCop = calculateCoeffCop(classes, bands, zone, area)[ZERO_IDX];
+                    double[] coeffCop = calculateCoeffCop(classes, bands, zone, area, percentual)[ZERO_IDX];
 
                     Geometry geo = ((ROIGeometry) zone.getROI()).getAsGeometry();
 
@@ -349,10 +358,16 @@ public class CLCProcess implements GSProcess {
     }
 
     private double[][] calculateCoeffCop(Set<Integer> classes, int[] bands, ZoneGeometry zone,
-            double area) {
+            double area, boolean percentual) {
 
         double[][] coeffCop = new double[bands.length][classes.size()];
 
+        double multiplier = 1;
+        
+        if(percentual){
+            multiplier = 100;
+        }
+        
         double adminArea;
         for (int b : bands) {
 
@@ -364,7 +379,7 @@ public class CLCProcess implements GSProcess {
             int count = 0;
             for (Integer clc : classes) {
                 double clcArea = histogram[clc] * area;
-                coeffCop[b][count++] = clcArea / adminArea;
+                coeffCop[b][count++] = clcArea / adminArea * multiplier;
             }
         }
 
