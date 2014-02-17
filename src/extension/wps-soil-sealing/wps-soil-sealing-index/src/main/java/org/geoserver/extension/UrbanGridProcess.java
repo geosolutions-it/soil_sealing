@@ -1,5 +1,13 @@
 package org.geoserver.extension;
 
+import it.geosolutions.jaiext.algebra.AlgebraDescriptor;
+import it.geosolutions.jaiext.algebra.AlgebraDescriptor.Operator;
+import it.geosolutions.jaiext.bandmerge.BandMergeDescriptor;
+import it.geosolutions.jaiext.buffer.BufferDescriptor;
+
+import java.awt.RenderingHints;
+import java.awt.image.DataBuffer;
+import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -17,12 +25,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.media.jai.ROI;
+import javax.media.jai.RenderedOp;
+import javax.media.jai.operator.BandSelectDescriptor;
+
 import org.geoserver.extension.CLCProcess.StatisticContainer;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
 import org.geotools.factory.CommonFactoryFinder;
+import org.geotools.factory.GeoTools;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.JTS;
@@ -31,7 +44,9 @@ import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.process.gs.GSProcess;
 import org.geotools.referencing.CRS;
+import org.jaitools.imageutils.ROIGeometry;
 import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.type.FeatureType;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory2;
 import org.opengis.referencing.FactoryException;
@@ -41,7 +56,22 @@ import org.opengis.referencing.operation.TransformException;
 
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.geom.Polygon;
 
+/**
+ * This process calculates various indexes on the UrbanGrids. Indexes 5-6-7b-7c are calculated using Urban Grids as polygons. The other indexes are
+ * calculated using Urban Grids as rasters. Operations on polygons are calculated by multiple threads.
+ * 
+ * The following hypotheses must be verified:
+ * <ul>
+ * <li>Input Geometries must be transformed to the Raster space for the indexes 5-6-7b-7c, while must be on the UrbanGrids CRS for the other indexes;</li>
+ * <li>Coverages must be cropped to the active area.</li>
+ * </ul>
+ * 
+ * 
+ * @author geosolutions
+ * 
+ */
 public class UrbanGridProcess implements GSProcess {
 
     public static final Logger LOGGER = Logger.getLogger(UrbanGridProcess.class.toString());
@@ -79,6 +109,9 @@ public class UrbanGridProcess implements GSProcess {
 
     public static final CoordinateReferenceSystem UTM32N;
 
+    /*
+     * Saving of the EPSG:32632 crs
+     */
     static {
         CoordinateReferenceSystem crs = null;
         try {
@@ -91,6 +124,7 @@ public class UrbanGridProcess implements GSProcess {
 
     }
 
+    /** Countdown latch used for handling various threads simultaneously */
     private CountDownLatch latch;
 
     // HP to verify
@@ -107,7 +141,7 @@ public class UrbanGridProcess implements GSProcess {
             @DescribeParameter(name = "pixelarea", min = 0, description = "Pixel Area") Double pixelArea,
             @DescribeParameter(name = "rois", min = 1, description = "Administrative Areas") List<Geometry> rois,
             @DescribeParameter(name = "populations", min = 0, description = "Populations for each Area") List<List<Integer>> populations,
-            @DescribeParameter(name = "coefficient", min = 0, description = "Administrative Areas") Double coeff)
+            @DescribeParameter(name = "coefficient", min = 0, description = "Multiplier coefficient for index 10") Double coeff)
             throws Exception {
 
         // Check on the index 7
@@ -118,18 +152,19 @@ public class UrbanGridProcess implements GSProcess {
         if (index == SEVENTH_INDEX && (nullSubId || !(subIndexA || subIndexB || subIndexC))) {
             throw new IllegalArgumentException("Wrong subindex for index 7");
         }
-
+        // Check if almost one coverage is present
         if (referenceCoverage == null && nowCoverage == null) {
             throw new IllegalArgumentException("No input Coverage provided");
         }
 
+        // Number of Geometries
         int numThreads = rois.size();
-
+        // Check if Geometry area or perimeter must be calculated
         boolean area = false;
-
+        // Simple class set used for the raster calculations on indexes 7a-9-10
         Set<Integer> classes = new TreeSet<Integer>();
         classes.add(Integer.valueOf(1));
-
+        // Selection of the operation to do for each index
         switch (index) {
         case FIFTH_INDEX:
             area = true;
@@ -146,8 +181,8 @@ public class UrbanGridProcess implements GSProcess {
             }
         case EIGHTH_INDEX:
             // Raster elaboration
-            break;
-        // For the indexes 9-10 Zonal Stats are calculated
+            return prepareImages(referenceCoverage, nowCoverage, rois, pixelArea * HACONVERTER);
+            // For the indexes 9-10 Zonal Stats are calculated
         case NINTH_INDEX:
             return new CLCProcess().execute(referenceCoverage, nowCoverage, classes,
                     CLCProcess.THIRD_INDEX, pixelArea, rois, populations, Double.valueOf(1), null);
@@ -164,10 +199,10 @@ public class UrbanGridProcess implements GSProcess {
 
         // If index is not 7a-8-9-10 then the input Urban Grids must be loaded
         // from the shp file.
-        
+
         double[] statsRef = null;
         double[] statsNow = null;
-
+        // For each coverage are calculated the results
         if (referenceCoverage != null) {
             statsRef = prepareResults(IMP_2006_SHP, index, rois, subIndexB, numThreads, area);
         }
@@ -175,20 +210,28 @@ public class UrbanGridProcess implements GSProcess {
         if (nowCoverage != null) {
             statsNow = prepareResults(IMP_2009_SHP, index, rois, subIndexB, numThreads, area);
         }
-
+        // Result accumulation
         List<StatisticContainer> results = accumulateResults(rois, statsRef, statsNow);
 
         return results;
 
     }
 
+    /**
+     * Takes the in input the result for each Coverage and return the result as a List of {@link StatisticContainer} objects.
+     * 
+     * @param rois input geometries used for calculations
+     * @param reference reference coverage results array
+     * @param now current coverage results array
+     * @return
+     */
     private List<StatisticContainer> accumulateResults(List<Geometry> rois, double[] reference,
             double[] now) {
-
+        // Geometries number
         int numGeo = rois.size();
-
+        // Final list initialization
         List<StatisticContainer> results = new ArrayList<StatisticContainer>(numGeo);
-
+        // Check on the input coverages
         if (reference == null && now == null) {
             throw new ProcessException("No result has been calculated");
         } else if (reference != null && now == null) {
@@ -197,6 +240,7 @@ public class UrbanGridProcess implements GSProcess {
                 throw new ProcessException(
                         "Geometries and their results don't have the same dimensions");
             }
+            // For each Geometry a container is created
             for (int i = 0; i < numGeo; i++) {
                 Geometry geo = rois.get(i);
 
@@ -210,6 +254,7 @@ public class UrbanGridProcess implements GSProcess {
                 throw new ProcessException(
                         "Geometries and their results don't have the same dimensions");
             }
+            // For each Geometry a container is created
             for (int i = 0; i < numGeo; i++) {
                 Geometry geo = rois.get(i);
 
@@ -223,49 +268,86 @@ public class UrbanGridProcess implements GSProcess {
                 throw new ProcessException(
                         "Geometries and their results don't have the same dimensions");
             }
+            // For each Geometry a container is created
             for (int i = 0; i < numGeo; i++) {
+                // Selection of the geometry
                 Geometry geo = rois.get(i);
-                double percentual = ((now[i] - reference[i]) / reference[i]) * 100;
-                StatisticContainer container = new StatisticContainer(geo,
-                        new double[] { percentual }, null);
+                // Selection of the index for the current and reference coverages
+                double nowIdx = now[i];
+                double refIdx = reference[i];
+                // Percentual variation calculation
+                double percentual = ((nowIdx - refIdx) / refIdx) * 100;
+                StatisticContainer container = new StatisticContainer();
+                container.setGeom(geo);
+                container.setResultsRef(new double[] { refIdx });
+                container.setResultsNow(new double[] { nowIdx });
+                container.setResultsDiff(new double[] { percentual });
+
                 results.add(container);
             }
         }
         return results;
     }
 
+    /**
+     * Calculates the index for each Geometry and takes a ShapeFile path for Urban Grid Geometries.
+     * 
+     * @param inputShp Path to the shapefile to use
+     * @param index index to calculate
+     * @param rois Input Administrative Areas
+     * @param subIndexB Boolean indicating if the subIndex to calculate is "b"
+     * @param numThreads Total number of Threads to lauch
+     * @param area Boolean indicating if Urban Grid Area must be calculated
+     * @return
+     * @throws MalformedURLException
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws FactoryException
+     * @throws TransformException
+     */
     private double[] prepareResults(String inputShp, int index, List<Geometry> rois,
             boolean subIndexB, int numThreads, boolean area) throws MalformedURLException,
             IOException, InterruptedException, FactoryException, TransformException {
-
-        List<ListContainer> referenceGeom = caculateGeometries(inputShp, rois, numThreads, area);
-
+        // Calculation on the Urban Grids
+        List<ListContainer> urbanGrids = calculateGeometries(inputShp, rois, numThreads, area);
+        // Results
         double[] stats = new double[rois.size()];
-
+        // Counter used for cycling on the Geometries
         int counter = 0;
-
-        for (ListContainer container : referenceGeom) {
-            List<Double> areas = container.getList();
-
+        // Cycle on the urbanGrid results
+        for (ListContainer container : urbanGrids) {
+            // List of all the areas
+            List<Double> areas = container.getSortedList();
+            // Total polygon number except the biggest
             int numPolyNotMax = areas.size() - 1;
+            // Area of the maximum polygon
             double polyMaxArea = areas.get(numPolyNotMax);
-
+            // Calculation of the total urban area
             double sut = container.getTotalArea();
+            // Calculation of the urban area without the maximum polygon area
             double sud = sut - polyMaxArea;
-
+            // Calculation of the indexes
             switch (index) {
             case FIFTH_INDEX:
                 stats[counter] = sud / sut;
                 break;
             case SIXTH_INDEX:
+                // Selection of the Geometry
                 Geometry geo = rois.get(counter);
-                Geometry geoPrj = reprojectToEqualArea(UTM32N, geo);
-
+                // Selection of the Geometry CRS
+                CoordinateReferenceSystem sourceCRS = CRS.decode("EPSG:" + geo.getSRID());
+                if (sourceCRS == null) {
+                    sourceCRS = UTM32N;
+                }
+                // Geometry reprojection
+                Geometry geoPrj = reprojectToEqualArea(sourceCRS, geo);
+                // Geometry Area
                 double areaAdmin = geoPrj.getArea();
-
+                // Index calculations
                 stats[counter] = (container.getTotalPerimeter() / areaAdmin) / HACONVERTER;
                 break;
             case SEVENTH_INDEX:
+                // Check on the subIndex selected
                 if (subIndexB) {
                     stats[counter] = (polyMaxArea / sut) * 100;
                 } else {
@@ -279,30 +361,46 @@ public class UrbanGridProcess implements GSProcess {
         return stats;
     }
 
-    private List<ListContainer> caculateGeometries(String inputShp, List<Geometry> rois,
+    /**
+     * Calculates the UrbanGrid area/perimeters for each Administrative area inside a separate thread.
+     * 
+     * @param inputShp Input ShapeFile path
+     * @param rois List of all the input Geometries
+     * @param numThreads Number of threads to lauch
+     * @param area Boolean indicating if area must be calculated. (Otherwise perimeter is calculated)
+     * @return
+     * @throws MalformedURLException
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private List<ListContainer> calculateGeometries(String inputShp, List<Geometry> rois,
             int numThreads, boolean area) throws MalformedURLException, IOException,
             InterruptedException {
+        // Initialization of the CountDown latch for handling multiple threads together
         latch = new CountDownLatch(numThreads);
-        //
+        // ShapeFile selection
         File file = new File(inputShp);
         Map map = new HashMap();
         map.put("url", file.toURL());
+        // Datastore creation
         DataStore dataStore = DataStoreFinder.getDataStore(map);
-
+        // ThreadPoolExecutor object used for launching multiple threads simultaneously
         ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads, numThreads, 60,
                 TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(1000000));
-
+        // Final list containing the result calculated by each thread
         List<ListContainer> allLists = new ArrayList<ListContainer>(numThreads);
-
+        // Cycle on the input geometries
         for (Geometry geo : rois) {
+            // Creation of a new ListContainer object
             ListContainer container = new ListContainer();
             allLists.add(container);
+            // Creation of a new Runnable for the UrbanGrids computation
             MyRunnable run = new MyRunnable(geo, dataStore, container, area);
             executor.execute(run);
         }
-
+        // Waiting until all the threads have finished
         latch.await();
-
+        // Executor closure
         executor.shutdown();
 
         executor.awaitTermination(30, TimeUnit.SECONDS);
@@ -310,22 +408,118 @@ public class UrbanGridProcess implements GSProcess {
         return allLists;
     }
 
+    /**
+     * Private method which reprojects the input Geometry in the input CRS to a Lambert-Equal Area CRS used for calculating Geometry Area and
+     * perimeter.
+     * 
+     * @param sourceCRS Source geometry CRS.
+     * @param sourceGeometry Source Geometry
+     * @return
+     * @throws FactoryException
+     * @throws TransformException
+     */
     private Geometry reprojectToEqualArea(CoordinateReferenceSystem sourceCRS,
             Geometry sourceGeometry) throws FactoryException, TransformException {
         // Reproject to the Lambert Equal Area
+        // Geometry center used for centering the reprojection on the Geometry(reduces distance artifacts)
         Point center = sourceGeometry.getCentroid();
-
+        // Creation of a wkt for the selected Geometry
         String wkt = PROJ_4326.replace("%LAT0%", String.valueOf(center.getY()));
         wkt = wkt.replace("%LON0%", String.valueOf(center.getX()));
-
+        // Parsing of the selected WKT
         final CoordinateReferenceSystem targetCRS = CRS.parseWKT(wkt);
-
+        // Creation of the MathTransform associated to the reprojection
         MathTransform trans = CRS.findMathTransform(sourceCRS, targetCRS);
-
-        Geometry geoPrj = JTS.transform(sourceGeometry, trans);
+        // Geometry reprojection
+        Geometry geoPrj;
+        if(!trans.isIdentity()){
+            geoPrj = JTS.transform(sourceGeometry, trans);
+        }else{
+            geoPrj = sourceGeometry;
+        }       
         return geoPrj;
     }
 
+    /**
+     * Private method used for calculating index 8. This method takes 1/2 coverages in input and counts the not-0 values on a buffer for each pixel.
+     * If 2 coverages are provided the result will return the image for each coverage and their difference.
+     * 
+     * @param referenceCoverage Input reference coverage
+     * @param nowCoverage Input current coverage
+     * @param geoms Input Administrative Areas
+     * @param pixelArea Pixel area
+     * @return
+     */
+    private List<StatisticContainer> prepareImages(GridCoverage2D referenceCoverage,
+            GridCoverage2D nowCoverage, List<Geometry> geoms, double pixelArea) {
+        // Boolean indicating the presence of the reference and current coverages
+        boolean refExists = referenceCoverage != null;
+        boolean nowExists = nowCoverage != null;
+        // Selections of the Hints to use
+        RenderingHints hints = GeoTools.getDefaultHints();
+
+        RenderedImage inputImage = null;
+        // Merging of the 2 images if they are both present or selection of the single image
+        if (refExists) {
+            if (nowExists) {
+                double destinationNoData = 0d;
+                inputImage = BandMergeDescriptor.create(null, destinationNoData, hints,
+                        referenceCoverage.getRenderedImage(), nowCoverage.getRenderedImage());
+            } else {
+                inputImage = referenceCoverage.getRenderedImage();
+            }
+        } else {
+            inputImage = nowCoverage.getRenderedImage();
+        }
+        // ROI preparation
+        List<ROI> rois = new ArrayList<ROI>(geoms.size());
+        // ROIGeometry associated to the geometry objects
+        for (Geometry geom : geoms) {
+            rois.add(new ROIGeometry(geom));
+        }
+
+        // Padding dimensions used for the buffer creation
+        int leftPad = 10;
+        int rightPad = 10;
+        int bottomPad = 10;
+        int topPad = 10;
+        // Destination No Data value
+        double destNoData = 0;
+        // Final list initialization
+        List<StatisticContainer> stats = new ArrayList<StatisticContainer>(1);
+
+        StatisticContainer container = new StatisticContainer();
+
+        // Buffer calculation
+        RenderedOp buffered = BufferDescriptor.create(inputImage,
+                BufferDescriptor.DEFAULT_EXTENDER, leftPad, rightPad, topPad, bottomPad, rois,
+                null, destNoData, null, DataBuffer.TYPE_DOUBLE, pixelArea, hints);
+        // Selection of the first image
+        RenderedOp imageRef = BandSelectDescriptor.create(buffered, new int[] { 0 }, hints);
+        // Setting of the first image
+        container.setReferenceImage(imageRef);
+
+        RenderedOp imageNow = null;
+        // if even the current coverage exists, it is taken.
+        if (buffered.getNumBands() > 1) {
+            imageNow = BandSelectDescriptor.create(buffered, new int[] { 1 }, hints);
+
+            container.setNowImage(imageNow);
+            // Calculation of the variation between current and reference images
+            RenderedOp diff = AlgebraDescriptor.create(Operator.SUBTRACT, null, null, destNoData,
+                    hints, imageNow, imageRef);
+
+            container.setDiffImage(diff);
+        }
+        // Storing of the result
+        stats.add(container);
+
+        return stats;
+    }
+
+    /**
+     * This class implements Runnable and is used for executing calculations on the UrbanGrids for each Geometry.
+     */
     class MyRunnable implements Runnable {
 
         private Geometry geo;
@@ -345,7 +539,7 @@ public class UrbanGridProcess implements GSProcess {
 
         @Override
         public void run() {
-
+            // Selection of the Feature Source associated to the datastore
             String typeName = null;
             FeatureSource source = null;
             try {
@@ -355,17 +549,27 @@ public class UrbanGridProcess implements GSProcess {
                 LOGGER.log(Level.SEVERE, e.getMessage());
                 throw new ProcessException(e);
             }
-
+            // If the Feature source is not present, an exception is thrown
             if (source == null) {
                 throw new ProcessException("Source datastore not found");
             }
 
-            CoordinateReferenceSystem sourceCRS = source.getInfo().getCRS();
-
+            FeatureType schema = source.getSchema();
+            
+            // usually "THE_GEOM" for shapefiles
+            String geometryPropertyName = schema.getGeometryDescriptor().getLocalName();
+            if(geometryPropertyName== null || geometryPropertyName.isEmpty()){
+                geometryPropertyName = "THE_GEOM";
+            }
+            
+            // ShapeFile CRS
+            CoordinateReferenceSystem sourceCRS = schema.getGeometryDescriptor()
+                    .getCoordinateReferenceSystem();
+            // Filter on the data store by selecting only the geometries contained into the input Geometry
             FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
 
-            Filter filter = ff.within(ff.property("THE_GEOM"), ff.literal(geo));
-
+            Filter filter = ff.within(ff.property(geometryPropertyName), ff.literal(geo));
+            // Feature collection selection
             FeatureCollection coll = null;
             try {
                 coll = source.getFeatures(filter);
@@ -377,7 +581,7 @@ public class UrbanGridProcess implements GSProcess {
             if (coll == null) {
                 throw new ProcessException("Source Feature collection not found");
             }
-
+            // Iterator on the features
             FeatureIterator iter = coll.features();
 
             double totalPerimeter = 0;
@@ -386,39 +590,48 @@ public class UrbanGridProcess implements GSProcess {
             List<Double> areas = new ArrayList<Double>();
 
             double totalArea = 0;
-
+            // Cycle on each polygon
             try {
                 while (iter.hasNext()) {
                     SimpleFeature feature = (SimpleFeature) iter.next();
                     Geometry sourceGeometry = (Geometry) feature.getDefaultGeometry();
-
-                    Geometry geoPrj = reprojectToEqualArea(sourceCRS, sourceGeometry);
-
-                    if (area) {
-                        double area = geoPrj.getArea();
-                        areas.add(area);
-                        totalArea += area;
-                    } else {
-                        totalPerimeter += geoPrj.getLength();
+                    // If the geometry is a Polygon, then the operations are executed
+                    if (sourceGeometry instanceof Polygon) {
+                        // reprojection of the polygon
+                        Geometry geoPrj = reprojectToEqualArea(sourceCRS, sourceGeometry);
+                        // Area/Perimeter calculation
+                        if (area) {
+                            double area = geoPrj.getArea();
+                            areas.add(area);
+                            totalArea += area;
+                        } else {
+                            totalPerimeter += geoPrj.getLength();
+                        }
                     }
                 }
 
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, e.getMessage());
                 throw new ProcessException(e);
+            } finally {
+                // Iterator closure
+                iter.close();
             }
-
+            // Saving results
             if (area) {
                 values.setList(areas);
                 values.setTotalArea(totalArea);
             } else {
                 values.setTotalPerimeter(totalPerimeter);
             }
-
+            // Countdown of the latch
             latch.countDown();
         }
     }
 
+    /**
+     * Container class used for passing parameters between threads.
+     */
     class ListContainer {
 
         private List<Double> list;
@@ -430,10 +643,15 @@ public class UrbanGridProcess implements GSProcess {
         ListContainer() {
         }
 
-        public List<Double> getList() {
+        public List<Double> getSortedList() {
             return list;
         }
 
+        /**
+         * Note: this method takes the list and sort it
+         * 
+         * @param list
+         */
         public void setList(List<Double> list) {
             Collections.sort(list);
             this.list = list;
@@ -458,7 +676,5 @@ public class UrbanGridProcess implements GSProcess {
         public void setTotalArea(Double totalArea) {
             this.totalArea = totalArea;
         }
-
     }
-
 }
