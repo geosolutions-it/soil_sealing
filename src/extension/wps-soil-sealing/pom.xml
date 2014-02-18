@@ -102,7 +102,6 @@
 	<module>soil-sealing</module -->
     <module>wps-soil-sealing-index</module>
     <!--module>wps-changematrix</module-->
-    <!--module>wps-raster</module-->
   </modules>
 
   <profiles>

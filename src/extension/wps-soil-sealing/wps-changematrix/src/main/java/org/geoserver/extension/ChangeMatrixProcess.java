@@ -358,7 +358,7 @@ public class ChangeMatrixProcess implements GSProcess {
             final ThreadPoolExecutor executor = coverageAccess.getThreadPoolExecutor();
 
             final GridCoverage2D retValue = new ChangeMatrixCoreProcess().execute(
-                    referenceCoverage, nowCoverage, roiPrj, cm, gridToWorldCorner, equalCRS,
+                    referenceCoverage, nowCoverage, roiPrj, cm, null, gridToWorldCorner, equalCRS,
                     ciReference.getName(), executor);
 
             final String rasterName = retValue.getName().toString();
