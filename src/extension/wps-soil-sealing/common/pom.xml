@@ -23,8 +23,18 @@
 		</dependency>
 		<dependency>
 			<groupId>org.geoserver.extension</groupId>
-			<artifactId>wps-core</artifactId>
+			<artifactId>gs-wps-core</artifactId>
 			<version>${gs.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.geotools</groupId>
+			<artifactId>gt-process-raster</artifactId>
+			<version>${gt.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.geotools</groupId>
+			<artifactId>gt-coveragetools</artifactId>
+			<version>${gt.version}</version>
 		</dependency>
 		<!-- JAI-EXT dependencies -->
 		<dependency>

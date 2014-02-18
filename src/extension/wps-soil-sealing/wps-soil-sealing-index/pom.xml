@@ -10,7 +10,7 @@
   <groupId>org.geoserver.extension</groupId>
   <artifactId>wps-soil-sealing-index</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>wps-soil-sealing-index</name>
+  <name>Web Processing Service Soil Sealing WPS Processes associated to the indexes</name>
   <url>http://maven.apache.org</url>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

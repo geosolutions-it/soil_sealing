@@ -76,10 +76,6 @@ public class UrbanGridProcess implements GSProcess {
 
     public static final Logger LOGGER = Logger.getLogger(UrbanGridProcess.class.toString());
 
-    public static final String IMP_2006_SHP = "imp_2006.shp";
-
-    public static final String IMP_2009_SHP = "imp_2009.shp";
-
     public static final double HACONVERTER = 0.0001;
 
     public static final int FIFTH_INDEX = 5;
@@ -107,29 +103,22 @@ public class UrbanGridProcess implements GSProcess {
 
     public static final String PROJ_4326 = PROJ_HEADER + GEOGCS_4326 + PROJ_FOOTER;
 
-    public static final CoordinateReferenceSystem UTM32N;
-
-    /*
-     * Saving of the EPSG:32632 crs
-     */
-    static {
-        CoordinateReferenceSystem crs = null;
-        try {
-            crs = CRS.decode("EPSG:32632");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        UTM32N = crs;
-
-    }
-
     /** Countdown latch used for handling various threads simultaneously */
     private CountDownLatch latch;
 
+    /** Path associated to the shapefile of the reference image */
+    private String pathToRefShp;
+
+    /** Path associated to the shapefile of the current image */
+    private String pathToCurShp;
+
+    public UrbanGridProcess(String pathToRefShp, String pathToCurShp) {
+        this.pathToRefShp = pathToRefShp;
+        this.pathToCurShp = pathToCurShp;
+    }
+
     // HP to verify
-    // HP1 = admin geometries in Raster space, for index 7a-8-9-10; in UTM Zone
-    // 32 for other indexes
+    // HP1 = admin geometries in Raster space, for index 7a-8-9-10; in SHP CRS for the other indexes
     // HP2 = Coverages already cropped and transformed to the Raster Space
 
     @DescribeResult(name = "UrbanGridProcess", description = "Urban Grid indexes", type = List.class)
@@ -203,12 +192,12 @@ public class UrbanGridProcess implements GSProcess {
         double[] statsRef = null;
         double[] statsNow = null;
         // For each coverage are calculated the results
-        if (referenceCoverage != null) {
-            statsRef = prepareResults(IMP_2006_SHP, index, rois, subIndexB, numThreads, area);
+        if (referenceCoverage != null && pathToRefShp != null && !pathToRefShp.isEmpty()) {
+            statsRef = prepareResults(pathToRefShp, index, rois, subIndexB, numThreads, area);
         }
 
-        if (nowCoverage != null) {
-            statsNow = prepareResults(IMP_2009_SHP, index, rois, subIndexB, numThreads, area);
+        if (nowCoverage != null && pathToCurShp != null && !pathToCurShp.isEmpty()) {
+            statsNow = prepareResults(pathToCurShp, index, rois, subIndexB, numThreads, area);
         }
         // Result accumulation
         List<StatisticContainer> results = accumulateResults(rois, statsRef, statsNow);
@@ -336,9 +325,6 @@ public class UrbanGridProcess implements GSProcess {
                 Geometry geo = rois.get(counter);
                 // Selection of the Geometry CRS
                 CoordinateReferenceSystem sourceCRS = CRS.decode("EPSG:" + geo.getSRID());
-                if (sourceCRS == null) {
-                    sourceCRS = UTM32N;
-                }
                 // Geometry reprojection
                 Geometry geoPrj = reprojectToEqualArea(sourceCRS, geo);
                 // Geometry Area
@@ -432,11 +418,11 @@ public class UrbanGridProcess implements GSProcess {
         MathTransform trans = CRS.findMathTransform(sourceCRS, targetCRS);
         // Geometry reprojection
         Geometry geoPrj;
-        if(!trans.isIdentity()){
+        if (!trans.isIdentity()) {
             geoPrj = JTS.transform(sourceGeometry, trans);
-        }else{
+        } else {
             geoPrj = sourceGeometry;
-        }       
+        }
         return geoPrj;
     }
 
@@ -555,13 +541,13 @@ public class UrbanGridProcess implements GSProcess {
             }
 
             FeatureType schema = source.getSchema();
-            
+
             // usually "THE_GEOM" for shapefiles
             String geometryPropertyName = schema.getGeometryDescriptor().getLocalName();
-            if(geometryPropertyName== null || geometryPropertyName.isEmpty()){
+            if (geometryPropertyName == null || geometryPropertyName.isEmpty()) {
                 geometryPropertyName = "THE_GEOM";
             }
-            
+
             // ShapeFile CRS
             CoordinateReferenceSystem sourceCRS = schema.getGeometryDescriptor()
                     .getCoordinateReferenceSystem();
