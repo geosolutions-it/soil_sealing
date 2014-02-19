@@ -35,7 +35,8 @@ public class ChangeMatrixDTO {
 
         for (Integer elRef : classes) {
             for (Integer elNow : classes) {
-                final ChangeMatrixElement cme = new ChangeMatrixElement(elRef, elNow, cm.retrievePairOccurrences(elRef, elNow));
+                final ChangeMatrixElement cme = new ChangeMatrixElement(elRef, elNow,
+                        cm.retrievePairOccurrences(elRef, elNow));
                 add(cme);
             }
         }

@@ -175,7 +175,7 @@ public class CLCProcessTest {
         double deltaPop = DEFAULT_POP_NOW - DEFAULT_POP_REF;
 
         double correctArea = AREA * UrbanGridProcess.HACONVERTER;
-        
+
         // Expected result init
         roiArea = DEF_H * DEF_W / 4 * correctArea;
 
@@ -201,32 +201,32 @@ public class CLCProcessTest {
         double deltaArea = sumCLCnow - sumCLCref;
 
         // Index result
-//        if (deltaArea >= 0) {
-//            if (deltaPop >= 0) {
-//                clctest4 = IndexColor.GREEN.getValue();
-//            } else {
-//                clctest4 = IndexColor.YELLOW.getValue();
-//            }
-//        } else {
-//            if (deltaPop >= 0) {
-//                clctest4 = IndexColor.RED.getValue();
-//            } else {
-//                clctest4 = IndexColor.BLUE.getValue();
-//            }
-//        }
-        clctest4 = deltaArea/deltaPop;
+        // if (deltaArea >= 0) {
+        // if (deltaPop >= 0) {
+        // clctest4 = IndexColor.GREEN.getValue();
+        // } else {
+        // clctest4 = IndexColor.YELLOW.getValue();
+        // }
+        // } else {
+        // if (deltaPop >= 0) {
+        // clctest4 = IndexColor.RED.getValue();
+        // } else {
+        // clctest4 = IndexColor.BLUE.getValue();
+        // }
+        // }
+        clctest4 = deltaArea / deltaPop;
 
         // Test 5 values
         double sprawl = (deltaArea / sumCLCref) / (deltaPop / DEFAULT_POP_REF);
 
-//        if (sprawl > CLCProcess.UPPER_BOUND_INDEX_4) {
-//            clctest5 = IndexColor.RED.getValue();
-//        } else if (sprawl < CLCProcess.LOWER_BOUND_INDEX_4) {
-//            clctest5 = IndexColor.GREEN.getValue();
-//        } else {
-//            clctest5 = IndexColor.YELLOW.getValue();
-//        }
-        
+        // if (sprawl > CLCProcess.UPPER_BOUND_INDEX_4) {
+        // clctest5 = IndexColor.RED.getValue();
+        // } else if (sprawl < CLCProcess.LOWER_BOUND_INDEX_4) {
+        // clctest5 = IndexColor.GREEN.getValue();
+        // } else {
+        // clctest5 = IndexColor.YELLOW.getValue();
+        // }
+
         clctest5 = sprawl;
     }
 

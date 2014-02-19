@@ -6,24 +6,27 @@ package org.geoserver.wps.gs.soilsealing;
 
 /**
  * This Bean represent a single element of a ChangeMatrix
- * @author DamianoG, GeoSolutions 
- *
+ * 
+ * @author DamianoG, GeoSolutions
+ * 
  */
-public class ChangeMatrixElement implements Comparable<ChangeMatrixElement>{
+public class ChangeMatrixElement implements Comparable<ChangeMatrixElement> {
 
     /**
      * The Pixel class type, Image at time 0
      */
     private int ref;
+
     /**
-     * The Pixel class type, Image at time 1 
+     * The Pixel class type, Image at time 1
      */
     private int now;
+
     /**
      * The number of pixel that has been changed from class ref to class now
      */
     private long pixels;
-    
+
     /**
      * @param ref
      * @param now
@@ -77,14 +80,17 @@ public class ChangeMatrixElement implements Comparable<ChangeMatrixElement>{
         this.pixels = pixels;
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see java.lang.Comparable#compareTo(java.lang.Object)
      */
     @Override
     public int compareTo(ChangeMatrixElement o) {
-        if(o.getRef()==this.getRef()&&o.getNow()==this.getNow()&&o.getPixels()==this.getPixels()){
+        if (o.getRef() == this.getRef() && o.getNow() == this.getNow()
+                && o.getPixels() == this.getPixels()) {
             return 0;
         }
         return 1;
-    }    
+    }
 }

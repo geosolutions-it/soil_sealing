@@ -14,42 +14,42 @@ import java.io.Serializable;
  */
 public class FeatureAttribute implements Serializable {
 
-	private static final long serialVersionUID = 5280048102929539311L;
-	private String name;
-	private Object value;
+    private static final long serialVersionUID = 5280048102929539311L;
 
-	public FeatureAttribute(String name, Object value) {
-		this.name = name;
-		this.value = value;
-	}
+    private String name;
 
-	/**
-	 * @param name
-	 *            the name to set
-	 */
-	public void setName(String name) {
-		this.name = name;
-	}
+    private Object value;
 
-	/**
-	 * @return the name
-	 */
-	public Object getName() {
-		return name;
-	}
+    public FeatureAttribute(String name, Object value) {
+        this.name = name;
+        this.value = value;
+    }
 
-	/**
-	 * @param value
-	 *            the value to set
-	 */
-	public void setValue(Object value) {
-		this.value = value;
-	}
+    /**
+     * @param name the name to set
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	/**
-	 * @return the value
-	 */
-	public Object getValue() {
-		return value;
-	}
+    /**
+     * @return the name
+     */
+    public Object getName() {
+        return name;
+    }
+
+    /**
+     * @param value the value to set
+     */
+    public void setValue(Object value) {
+        this.value = value;
+    }
+
+    /**
+     * @return the value
+     */
+    public Object getValue() {
+        return value;
+    }
 }

@@ -72,7 +72,7 @@ public class JiffleScriptProcessTest extends WPSTestSupport {
     private static final int FINAL_NUM_BANDS = 1;
 
     private final static JiffleScriptProcess process = new JiffleScriptProcess();
-    
+
     private final static JiffleScriptListProcess process2 = new JiffleScriptListProcess();
 
     private static GridCoverage2D testCoverage1;
@@ -348,7 +348,8 @@ public class JiffleScriptProcessTest extends WPSTestSupport {
 
             ColorModel cm = testCoverage3.getRenderedImage().getColorModel();
 
-            if (cm != null && cm instanceof ComponentColorModel && cm.hasAlpha() && !cm.isAlphaPremultiplied()) {
+            if (cm != null && cm instanceof ComponentColorModel && cm.hasAlpha()
+                    && !cm.isAlphaPremultiplied()) {
                 numBandsIn--;
             }
 

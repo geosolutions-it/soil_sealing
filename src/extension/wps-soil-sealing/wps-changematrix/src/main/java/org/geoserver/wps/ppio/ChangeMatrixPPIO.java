@@ -20,8 +20,6 @@ import org.geoserver.wps.ppio.CDataPPIO;
  * 
  */
 public class ChangeMatrixPPIO extends CDataPPIO {
-	
-	
 
     public ChangeMatrixPPIO() {
         super(ChangeMatrixDTO.class, ChangeMatrixDTO.class, "application/json");
@@ -35,13 +33,13 @@ public class ChangeMatrixPPIO extends CDataPPIO {
     @Override
     public void encode(Object value, OutputStream os) throws Exception {
         PrintWriter pw = new PrintWriter(os);
-        try{
+        try {
 
-            //pw.write(JSONSerializer.toJSON(((ChangeMatrixDTO)value).getChangeMatrix()).toString());
-        	pw.write(JSONSerializer.toJSON(((ChangeMatrixDTO)value)).toString());
-        } finally{
-        	IOUtils.closeQuietly(pw);
-        	IOUtils.closeQuietly(os);
+            // pw.write(JSONSerializer.toJSON(((ChangeMatrixDTO)value).getChangeMatrix()).toString());
+            pw.write(JSONSerializer.toJSON(((ChangeMatrixDTO) value)).toString());
+        } finally {
+            IOUtils.closeQuietly(pw);
+            IOUtils.closeQuietly(os);
         }
     }
 
@@ -50,7 +48,9 @@ public class ChangeMatrixPPIO extends CDataPPIO {
         return "json";
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see org.geoserver.wps.ppio.CDataPPIO#decode(java.lang.String)
      */
     @Override
