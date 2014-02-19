@@ -4,31 +4,47 @@
  */
 package org.geoserver.wps.gs.soilsealing;
 
+import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.image.DataBuffer;
-import java.util.List;
+import java.io.File;
+import java.util.Collection;
 
+import javax.media.jai.JAI;
 import javax.media.jai.ROI;
+import javax.media.jai.ROIShape;
 
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
+import org.geotools.data.DataSourceException;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.geometry.jts.JTS;
+import org.geotools.geometry.jts.LiteShape2;
 import org.geotools.process.ProcessException;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
+import org.geotools.referencing.operation.transform.ProjectiveTransform;
 import org.geotools.util.Utilities;
+import org.geotools.utils.imageoverviews.OverviewsEmbedder;
+import org.geotools.utils.progress.ExceptionEvent;
+import org.geotools.utils.progress.ProcessingEvent;
+import org.geotools.utils.progress.ProcessingEventListener;
 import org.jaitools.imageutils.ROIGeometry;
-import org.jaitools.media.jai.rangelookup.RangeLookupTable;
-import org.jaitools.numeric.Range;
 import org.opengis.coverage.SampleDimensionType;
+import org.opengis.coverage.grid.GridEnvelope;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.geometry.MismatchedDimensionException;
+import org.opengis.parameter.GeneralParameterValue;
+import org.opengis.parameter.ParameterDescriptor;
+import org.opengis.parameter.ParameterValue;
 import org.opengis.referencing.operation.TransformException;
 
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
 
 /**
@@ -36,43 +52,13 @@ import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
  * implementations.
  * 
  * @author Simone Giannecchini, GeoSolutions
+ * @author Alessio Fabiani, GeoSolutions
  */
 public class CoverageUtilities {
     /**
      * Do not allows instantiation of this class.
      */
     private CoverageUtilities() {
-    }
-
-    /**
-     * Utility method for transforming a geometry ROI into the raster space, using the provided affine transformation.
-     * 
-     * @param roi a {@link Geometry} in model space.
-     * @param mt2d an {@link AffineTransform} that maps from raster to model space. This is already referred to the pixel corner.
-     * @return a {@link ROI} suitable for using with JAI.
-     * @throws ProcessException in case there are problems with ivnerting the provided {@link AffineTransform}. Very unlikely to happen.
-     */
-    public static ROI prepareROI(Geometry roi, AffineTransform mt2d) throws ProcessException {
-        // transform the geometry to raster space so that we can use it as a ROI source
-        Geometry rasterSpaceGeometry;
-        try {
-            rasterSpaceGeometry = JTS.transform(roi, new AffineTransform2D(mt2d.createInverse()));
-        } catch (MismatchedDimensionException e) {
-            throw new ProcessException(e);
-        } catch (TransformException e) {
-            throw new ProcessException(e);
-        } catch (NoninvertibleTransformException e) {
-            throw new ProcessException(e);
-        }
-        // System.out.println(rasterSpaceGeometry);
-        // System.out.println(rasterSpaceGeometry.getEnvelopeInternal());
-
-        // simplify the geometry so that it's as precise as the coverage, excess coordinates
-        // just make it slower to determine the point in polygon relationship
-        Geometry simplifiedGeometry = DouglasPeuckerSimplifier.simplify(rasterSpaceGeometry, 1);
-
-        // build a shape using a fast point in polygon wrapper
-        return new ROIGeometry(simplifiedGeometry);
     }
 
     /**
@@ -262,4 +248,196 @@ public class CoverageUtilities {
     // }
     // }
 
+    /**
+     * Replace or add the provided parameter in the read parameters
+     */
+    public static <T> GeneralParameterValue[] replaceParameter(
+            GeneralParameterValue[] readParameters, Object value, ParameterDescriptor<T> pd) {
+
+        // scan all the params looking for the one we want to add
+        for (GeneralParameterValue gpv : readParameters) {
+            // in case of match of any alias add a param value to the lot
+            if (gpv.getDescriptor().getName().equals(pd.getName())) {
+                ((ParameterValue) gpv).setValue(value);
+                // leave
+                return readParameters;
+            }
+        }
+
+        // add it to the array
+        // add to the list
+        GeneralParameterValue[] readParametersClone = new GeneralParameterValue[readParameters.length + 1];
+        System.arraycopy(readParameters, 0, readParametersClone, 0, readParameters.length);
+        final ParameterValue<T> pv = pd.createValue();
+        pv.setValue(value);
+        readParametersClone[readParameters.length] = pv;
+        readParameters = readParametersClone;
+        return readParameters;
+    }
+
+    /**
+     * Utility method for transforming a geometry ROI into the raster space, using the provided affine transformation.
+     * 
+     * @param roi a {@link Geometry} in model space.
+     * @param mt2d an {@link AffineTransform} that maps from raster to model space. This is already referred to the pixel corner.
+     * @return a {@link ROI} suitable for using with JAI.
+     * @throws ProcessException in case there are problems with ivnerting the provided {@link AffineTransform}. Very unlikely to happen.
+     */
+    public static ROI prepareROI(Geometry roi, AffineTransform mt2d) throws ProcessException {
+        // transform the geometry to raster space so that we can use it as a ROI source
+        Geometry rasterSpaceGeometry;
+        try {
+            rasterSpaceGeometry = JTS.transform(roi, new AffineTransform2D(mt2d.createInverse()));
+        } catch (MismatchedDimensionException e) {
+            throw new ProcessException(e);
+        } catch (TransformException e) {
+            throw new ProcessException(e);
+        } catch (NoninvertibleTransformException e) {
+            throw new ProcessException(e);
+        }
+        // System.out.println(rasterSpaceGeometry);
+        // System.out.println(rasterSpaceGeometry.getEnvelopeInternal());
+
+        // simplify the geometry so that it's as precise as the coverage, excess coordinates
+        // just make it slower to determine the point in polygon relationship
+        Geometry simplifiedGeometry = DouglasPeuckerSimplifier.simplify(rasterSpaceGeometry, 1);
+
+        // build a shape using a fast point in polygon wrapper
+        return new ROIGeometry(simplifiedGeometry);
+    }
+
+    /**
+     * Transform the provided {@link Geometry} in world coordinates into
+     * 
+     * @param roi
+     * @param gridToWorld
+     * @return
+     * @throws Exception
+     */
+    public static ROI prepareROI2(Geometry roi, AffineTransform gridToWorld) throws Exception {
+        final Shape cropRoiLS2 = new LiteShape2(roi, ProjectiveTransform.create(gridToWorld)
+                .inverse(), null, true, 1);
+        return new ROIShape(cropRoiLS2);
+    }
+
+    /**
+     * Transform the provided {@link Geometry} in world coordinates into
+     * 
+     * @param roi
+     * @param gridToWorld
+     * @return
+     * @throws Exception
+     */
+    public static ROI prepareROIGeometry(Geometry roi, AffineTransform gridToWorld)
+            throws Exception {
+
+        Geometry projected = JTS.transform(roi, ProjectiveTransform.create(gridToWorld).inverse());
+
+        return new ROIGeometry(projected);
+    }
+
+    /**
+     * @param geomPolys
+     * @param geom
+     */
+    public static void extractPolygons(Collection<Polygon> geomPolys, Geometry geom) {
+        if (geom instanceof MultiPolygon) {
+            for (int i = 0; i < ((MultiPolygon) geom).getNumGeometries(); i++) {
+                Geometry g = ((MultiPolygon) geom).getGeometryN(i);
+                if (g instanceof Polygon) {
+                    if (g.getGeometryType().compareToIgnoreCase("Polygon") == 0) {
+                        g.setSRID(geom.getSRID());
+                        geomPolys.add((Polygon) g);
+                    }
+                }
+            }
+        } else if (geom instanceof Polygon) {
+            if (geom.getGeometryType().compareToIgnoreCase("Polygon") == 0) {
+                geomPolys.add((Polygon) geom);
+            }
+        }
+    }
+
+    /**
+     * @param retValue
+     * @return the number of steps processed, or 0 if none was done, or -1 on error.
+     * @throws DataSourceException
+     */
+    public static int generateOverviews(AbstractGridCoverage2DReader abstractGridCoverage2DReader)
+            throws DataSourceException {
+        final File geotiffFile = (File) abstractGridCoverage2DReader.getSource();
+        // ////
+        // Adding Overviews
+        // ////
+
+        int tileH = 512;
+        int tileW = 512;
+
+        /** computing the number of steps **/
+        GridEnvelope gridRange = abstractGridCoverage2DReader.getOriginalGridRange();
+
+        int height = gridRange.getSpan(1);
+        int width = gridRange.getSpan(0);
+
+        int ratioH = (int) Math.ceil((1.0 * height) / tileH);
+        int ratioW = (int) Math.ceil((1.0 * width) / tileW);
+
+        int nStepsH = 0;
+        int nStepsW = 0;
+
+        if (ratioH >= 2) {
+            nStepsH = (int) Math.floor(Math.log(ratioH) / Math.log(2));
+        }
+
+        if (ratioW >= 2) {
+            nStepsW = (int) Math.floor(Math.log(ratioW) / Math.log(2));
+        }
+
+        int numSteps = Math.min(nStepsH, nStepsW);
+        int downSampleSteps = 2;
+
+        if (numSteps > 0) {
+            final OverviewsEmbedder oe = new OverviewsEmbedder();
+            oe.setDownsampleStep(downSampleSteps);
+            oe.setNumSteps(numSteps);
+            oe.setScaleAlgorithm(OverviewsEmbedder.SubsampleAlgorithm.Nearest.toString());
+            oe.setTileCache(JAI.getDefaultInstance().getTileCache());
+            // oe.setTileHeight(tileH);
+            // oe.setTileWidth(tileW);
+            oe.setSourcePath(geotiffFile.getAbsolutePath());
+
+            EmbedderListener listener = new EmbedderListener(geotiffFile.getAbsolutePath());
+            // add logger/listener
+            oe.addProcessingEventListener(listener);
+
+            // run
+            oe.run(); // should block until terminated
+            return listener.isSuccess() ? numSteps : -1;
+        } else
+            return 0;
+    }
+
+    static class EmbedderListener implements ProcessingEventListener {
+        final String filename;
+
+        boolean success = false;
+
+        public EmbedderListener(String filename) {
+            this.filename = filename;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void exceptionOccurred(ExceptionEvent event) {
+            success = false;
+        }
+
+        public void getNotification(ProcessingEvent event) {
+            if (event.getPercentage() == 100.0) {
+                success = true;
+            }
+        }
+    }
 }
