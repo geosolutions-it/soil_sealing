@@ -2,7 +2,7 @@
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
-package org.geoserver.extension;
+package org.geoserver.wps.gs.soilsealing;
 
 import java.io.File;
 import java.util.ArrayList;
