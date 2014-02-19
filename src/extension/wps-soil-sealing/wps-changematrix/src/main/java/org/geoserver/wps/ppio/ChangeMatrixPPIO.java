@@ -1,8 +1,8 @@
-/* Copyright (c) 2012 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, available at the root
- * application directory.
+/* Copyright (c) 2001 - 2014 OpenPlans - www.openplans.org. All rights 
+ * reserved. This code is licensed under the GPL 2.0 license, available at the 
+ * root application directory.
  */
-package org.geoserver.extension;
+package org.geoserver.wps.ppio;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -11,6 +11,7 @@ import java.io.PrintWriter;
 import net.sf.json.JSONSerializer;
 
 import org.apache.commons.io.IOUtils;
+import org.geoserver.wps.gs.soilsealing.ChangeMatrixDTO;
 import org.geoserver.wps.ppio.CDataPPIO;
 
 /**
