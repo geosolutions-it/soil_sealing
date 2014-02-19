@@ -19,29 +19,29 @@
   <dependencies>
 
 	<dependency>
-	  <groupId>org.geoserver.extension</groupId>
+	  <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	  <artifactId>wps-core</artifactId>
 	  <version>${gs.version}</version>
 	</dependency>
 	<dependency>
-	  <groupId>org.geoserver.extension</groupId>
+	  <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	  <artifactId>web-wps</artifactId>
 	  <version>${gs.version}</version>
 	</dependency>
 
 	<!-- Specific Soil Sealing WPS Processes -->
 	<dependency>
-	  <groupId>org.geoserver.extension</groupId>
+	  <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	  <artifactId>gs-wps-soil-sealing-common</artifactId>
 	  <version>${project.version}</version>
 	</dependency>
 	<dependency>
-	  <groupId>org.geoserver.extension</groupId>
+	  <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	  <artifactId>gs-wps-soil-sealing-index</artifactId>
 	  <version>${project.version}</version>
 	</dependency>
 	<dependency>
-	  <groupId>org.geoserver.extension</groupId>
+	  <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	  <artifactId>gs-wps-changematrix</artifactId>
 	  <version>${project.version}</version>
 	</dependency>
@@ -234,57 +234,57 @@
 	   <version>${gt.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>sqlserver</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>oracle</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>charts</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency> 
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>jp2k</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency> 
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>gdal</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency> 
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>arcsde</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>control-flow</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>wps-core</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>web-wps</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>monitor-core</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-	   <groupId>org.geoserver.extension</groupId>
+	   <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 	   <artifactId>monitor-hibernate</artifactId>
 	   <version>${gs.version}</version>
 	  </dependency>
@@ -294,7 +294,7 @@
 	   <version>${gs.version}</version>
 	  </dependency>
 	  <dependency>
-		 <groupId>org.geoserver.extension</groupId>
+		 <groupId>org.geoserver.wps.gs.soilsealing</groupId>
 		 <artifactId>inspire</artifactId>
 		 <version>${gs.version}</version>
 	  </dependency>
@@ -456,7 +456,7 @@
       <id>arcsde</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>arcsde</artifactId> 
           <version>${gs.version}</version>
         </dependency>
@@ -485,7 +485,7 @@
       <id>sqlserver</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>sqlserver</artifactId> 
           <version>${gs.version}</version>
         </dependency>
@@ -495,7 +495,7 @@
       <id>oracle</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>oracle</artifactId> 
           <version>${gs.version}</version>
         </dependency>
@@ -505,7 +505,7 @@
       <id>mysql</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>mysql</artifactId> 
           <version>${gs.version}</version>
         </dependency>
@@ -530,7 +530,7 @@
      <id>h2</id>
      <dependencies>
       <dependency>
-       <groupId>org.geoserver.extension</groupId>
+       <groupId>org.geoserver.wps.gs.soilsealing</groupId>
        <artifactId>h2</artifactId>
        <version>${gs.version}</version>
       </dependency>
@@ -540,7 +540,7 @@
      <id>validation</id>
      <dependencies>
       <dependency>
-        <groupId>org.geoserver.extension</groupId>
+        <groupId>org.geoserver.wps.gs.soilsealing</groupId>
         <artifactId>validation</artifactId>
         <version>${gs.version}</version>
       </dependency>
@@ -560,7 +560,7 @@
       <id>geosearch</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>geosearch</artifactId> 
           <version>${gs.version}</version>
         </dependency>
@@ -570,7 +570,7 @@
       <id>imagemosaic-jdbc</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>imagemosaic-jdbc</artifactId> 
           <version>${gs.version}</version>
         </dependency>
@@ -580,7 +580,7 @@
       <id>feature-pregeneralized</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>feature-pregeneralized</artifactId> 
           <version>${gs.version}</version>
         </dependency>
@@ -650,7 +650,7 @@
       <id>control-flow</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>control-flow</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -680,7 +680,7 @@
       <id>charts</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>charts</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -690,7 +690,7 @@
       <id>css</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>css</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -723,7 +723,7 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>monitor-core</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -736,7 +736,7 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>monitor-hibernate</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -746,7 +746,7 @@
       <id>ogr</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>ogr</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -786,7 +786,7 @@
       <id>inspire</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>inspire</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -796,7 +796,7 @@
       <id>querylayer</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>querylayer</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -806,7 +806,7 @@
       <id>jp2k</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>jp2k</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -816,7 +816,7 @@
       <id>gdal</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>gdal</artifactId>
           <version>${gs.version}</version>
         </dependency>
@@ -846,7 +846,7 @@
       <id>teradata</id>
       <dependencies>
         <dependency>
-          <groupId>org.geoserver.extension</groupId>
+          <groupId>org.geoserver.wps.gs.soilsealing</groupId>
           <artifactId>teradata</artifactId>
           <version>${gs.version}</version>
         </dependency>

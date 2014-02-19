@@ -5,16 +5,15 @@
 <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
 <beans>
 	<!-- The PPIO that need to be registered into SPI because of their dependencies -->
-	<bean id="changeMatrixDTOPPIO" class="org.geoserver.wps.raster.ChangeMatrixPPIO" />
-	<bean id="jaitoolsRangePPIO" class="org.geoserver.wps.ppio.JAIToolsRangePPIO" />
+	<bean id="changeMatrixDTOPPIO" class="org.geoserver.wps.ppio.ChangeMatrixPPIO" />
 
 	<!-- Register the GeoServer factory and processes -->
-	<bean id="changeMatrix" class="org.geoserver.extension.ChangeMatrixProcess">
+	<bean id="changeMatrix" class="org.geoserver.wps.gs.soilsealing.ChangeMatrixProcess">
 		<constructor-arg index="0" ref="catalog" />
 		<constructor-arg index="1" ref="geoServer" />
 	</bean>
 	<bean id="changeMatrixDeleteTransactionListener"
-		class="org.geoserver.extension.ChangeMatrixDeleteTransactionListener">
+		class="org.geoserver.wps.gs.soilsealing.ChangeMatrixDeleteTransactionListener">
 		<constructor-arg index="0" ref="geoServer" />
 	</bean>
 
