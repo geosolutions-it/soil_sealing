@@ -1,4 +1,4 @@
-package org.geoserver.extension;
+package org.geoserver.wps.gs.soilsealing;
 
 import it.geosolutions.jaiext.algebra.AlgebraDescriptor;
 import it.geosolutions.jaiext.algebra.AlgebraDescriptor.Operator;
@@ -29,7 +29,7 @@ import javax.media.jai.ROI;
 import javax.media.jai.RenderedOp;
 import javax.media.jai.operator.BandSelectDescriptor;
 
-import org.geoserver.extension.CLCProcess.StatisticContainer;
+import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;

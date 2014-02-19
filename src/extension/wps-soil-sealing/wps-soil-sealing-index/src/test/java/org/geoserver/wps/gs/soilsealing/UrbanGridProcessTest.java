@@ -1,4 +1,4 @@
-package org.geoserver.extension;
+package org.geoserver.wps.gs.soilsealing;
 
 import java.awt.image.ComponentSampleModel;
 import java.awt.image.DataBuffer;
@@ -9,6 +9,7 @@ import java.util.ArrayList;
 
 import javax.media.jai.TiledImage;
 
+import org.geoserver.wps.gs.soilsealing.UrbanGridProcess;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.factory.GeoTools;
@@ -50,9 +51,9 @@ public class UrbanGridProcessTest {
 
     private static UrbanGridProcess urbanProcess;
 
-    private static String pathToRefShp = "";
+    private static String pathToRefShp = "referenceCov.shp";
 
-    private static String pathToCurShp = "";
+    private static String pathToCurShp = "nowCov.shp";
     
     
     @BeforeClass
@@ -97,10 +98,58 @@ public class UrbanGridProcessTest {
     
     
     @Test
-    public void test() {
+    public void testIndex5() {
+        
+    }
+    
+    @Test
+    public void testIndex5img2() {
         
     }
 
+    @Test
+    public void testIndex6() {
+        
+    }
+    
+    @Test
+    public void testIndex6img2() {
+        
+    }
+    
+    @Test
+    public void testIndex7() {
+        
+    }
+    
+    @Test
+    public void testIndex7img2() {
+        
+    }
+    
+    @Test
+    public void testIndex8() {
+        
+    }
+    
+    @Test
+    public void testIndex8img2() {
+        
+    }
+    
+    @Test
+    public void testIndex9() {
+        
+    }
+    
+    @Test
+    public void testIndex10() {
+        
+    }
+    
+    
+    
+    
     
     
     public static GridCoverage2D createImage(boolean reference){

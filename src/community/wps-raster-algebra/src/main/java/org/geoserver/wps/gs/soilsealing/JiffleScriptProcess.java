@@ -1,4 +1,4 @@
-package org.geoserver.wps.gs.raster.algebra;
+package org.geoserver.wps.gs.soilsealing;
 
 import java.awt.image.DataBuffer;
 import java.awt.image.RenderedImage;

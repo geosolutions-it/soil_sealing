@@ -1,4 +1,4 @@
-package org.geoserver.wps.gs.raster.algebra;
+package org.geoserver.wps.gs.soilsealing;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
@@ -22,6 +22,8 @@ import javax.media.jai.operator.BandMergeDescriptor;
 import org.apache.commons.io.FileUtils;
 import org.geoserver.data.test.SystemTestData;
 import org.geoserver.wps.WPSTestSupport;
+import org.geoserver.wps.gs.soilsealing.JiffleScriptListProcess;
+import org.geoserver.wps.gs.soilsealing.JiffleScriptProcess;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.gce.geotiff.GeoTiffFormat;

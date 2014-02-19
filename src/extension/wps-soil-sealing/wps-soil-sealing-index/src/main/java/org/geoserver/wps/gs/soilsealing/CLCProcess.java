@@ -1,4 +1,4 @@
-package org.geoserver.extension;
+package org.geoserver.wps.gs.soilsealing;
 
 import it.geosolutions.jaiext.bandmerge.BandMergeDescriptor;
 import it.geosolutions.jaiext.stats.Statistics;

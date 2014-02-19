@@ -1,4 +1,4 @@
-package org.geoserver.extension;
+package org.geoserver.wps.gs.soilsealing;
 
 import java.awt.image.ComponentSampleModel;
 import java.awt.image.DataBuffer;
@@ -10,8 +10,10 @@ import java.util.TreeSet;
 
 import javax.media.jai.TiledImage;
 
-import org.geoserver.extension.CLCProcess.IndexColor;
-import org.geoserver.extension.CLCProcess.StatisticContainer;
+import org.geoserver.wps.gs.soilsealing.CLCProcess;
+import org.geoserver.wps.gs.soilsealing.UrbanGridProcess;
+import org.geoserver.wps.gs.soilsealing.CLCProcess.IndexColor;
+import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.factory.GeoTools;
