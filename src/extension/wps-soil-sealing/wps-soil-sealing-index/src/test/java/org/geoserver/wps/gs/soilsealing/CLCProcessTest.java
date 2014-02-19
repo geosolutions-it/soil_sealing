@@ -1,4 +1,4 @@
-package org.geoserver.extension;
+package org.geoserver.wps.gs.soilsealing;
 
 import java.awt.image.ComponentSampleModel;
 import java.awt.image.DataBuffer;
@@ -10,8 +10,10 @@ import java.util.TreeSet;
 
 import javax.media.jai.TiledImage;
 
-import org.geoserver.extension.CLCProcess.IndexColor;
-import org.geoserver.extension.CLCProcess.StatisticContainer;
+import org.geoserver.wps.gs.soilsealing.CLCProcess;
+import org.geoserver.wps.gs.soilsealing.UrbanGridProcess;
+import org.geoserver.wps.gs.soilsealing.CLCProcess.IndexColor;
+import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.factory.GeoTools;
@@ -30,21 +32,21 @@ import com.vividsolutions.jts.geom.Polygon;
 
 public class CLCProcessTest {
 
-    private static final int DEF_H = 256;
+    public static final int DEF_H = 256;
 
-    private static final int DEF_W = 256;
+    public static final int DEF_W = 256;
 
-    private static final int DEF_TILE_H = 32;
+    public static final int DEF_TILE_H = 32;
 
-    private static final int DEF_TILE_W = 32;
+    public static final int DEF_TILE_W = 32;
 
-    private static final double AREA = CLCProcess.PIXEL_AREA;
+    public static final double AREA = CLCProcess.PIXEL_AREA;
 
-    private static final int DEFAULT_POP_REF = 10;
+    public static final int DEFAULT_POP_REF = 10;
 
-    private static final int DEFAULT_POP_NOW = 20;
+    public static final int DEFAULT_POP_NOW = 20;
 
-    private static final double DELTA = 0.0001;
+    public static final double DELTA = 0.0001;
 
     private static GridCoverage2D reference;
 

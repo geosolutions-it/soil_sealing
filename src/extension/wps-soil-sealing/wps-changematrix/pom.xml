@@ -5,16 +5,16 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<artifactId>gs-wps-soil-sealing</artifactId>
-		<groupId>org.geoserver.wps.gs.soilsealing</groupId>
+		<groupId>org.geoserver.extension</groupId>
 		<version>2.5-SOIL_SEALING-SNAPSHOT</version>
 	</parent>
-	<groupId>org.geoserver.wps.gs.soilsealing</groupId>
+	<groupId>org.geoserver.extension</groupId>
 	<artifactId>gs-wps-changematrix</artifactId>
 	<name>Web Processing Service Soil Sealing ChangeMatrix WPS processes</name>
 	<url>http://maven.apache.org</url>
 	<dependencies>
 		<dependency>
-			<groupId>org.geoserver.wps.gs.soilsealing</groupId>
+			<groupId>org.geoserver.extension</groupId>
 			<artifactId>gs-wps-soil-sealing-common</artifactId>
 			<version>${project.version}</version>
 		</dependency>

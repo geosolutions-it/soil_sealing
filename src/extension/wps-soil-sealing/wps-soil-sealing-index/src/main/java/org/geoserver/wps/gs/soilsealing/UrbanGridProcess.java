@@ -1,4 +1,4 @@
-package org.geoserver.extension;
+package org.geoserver.wps.gs.soilsealing;
 
 import it.geosolutions.jaiext.algebra.AlgebraDescriptor;
 import it.geosolutions.jaiext.algebra.AlgebraDescriptor.Operator;
@@ -29,7 +29,7 @@ import javax.media.jai.ROI;
 import javax.media.jai.RenderedOp;
 import javax.media.jai.operator.BandSelectDescriptor;
 
-import org.geoserver.extension.CLCProcess.StatisticContainer;
+import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
@@ -64,7 +64,7 @@ import com.vividsolutions.jts.geom.Polygon;
  * 
  * The following hypotheses must be verified:
  * <ul>
- * <li>Input Geometries must be transformed to the Raster space for the indexes 5-6-7b-7c, while must be on the UrbanGrids CRS for the other indexes;</li>
+ * <li>Input Geometries must be transformed to the Raster space for the indexes 7a-8-9-10, while must be on the UrbanGrids CRS for the other indexes;</li>
  * <li>Coverages must be cropped to the active area.</li>
  * </ul>
  * 
@@ -73,35 +73,49 @@ import com.vividsolutions.jts.geom.Polygon;
  * 
  */
 public class UrbanGridProcess implements GSProcess {
-
+    /** Logger used for logging exceptions */
     public static final Logger LOGGER = Logger.getLogger(UrbanGridProcess.class.toString());
 
+    /** Constant multiplier from square meters to ha */
     public static final double HACONVERTER = 0.0001;
 
+    /** Constant associated to the 5th idx */
     public static final int FIFTH_INDEX = 5;
 
+    /** Constant associated to the 6th idx */
     public static final int SIXTH_INDEX = 6;
 
+    /** Constant associated to the 7th idx */
     public static final int SEVENTH_INDEX = 7;
 
+    /** Constant associated to the 8th idx */
     public static final int EIGHTH_INDEX = 8;
 
+    /** Constant associated to the 9th idx */
     public static final int NINTH_INDEX = 9;
 
+    /** Constant associated to the 10th idx */
     public static final int TENTH_INDEX = 10;
 
+    /** Header of the local Lambert-Equal Area projection */
     public static final String PROJ_HEADER = "PROJCS[\"Local area projection/ LOCAL_AREA_PROJECTION\",";
 
+    /** Footer of the local Lambert-Equal Area projection */
     public static final String PROJ_FOOTER = ",PROJECTION[\"Lambert Azimuthal Equal Area\", AUTHORITY[\"EPSG\",\"9820\"]],"
             + "PARAMETER[\"latitude_of_center\", %LAT0%], PARAMETER[\"longitude_of_center\", %LON0%],"
             + "PARAMETER[\"false_easting\", 0.0], PARAMETER[\"false_northing\", 0.0],"
             + "UNIT[\"m\", 1.0], AXIS[\"Northing\", NORTH], AXIS[\"Easting\", EAST], AUTHORITY[\"EPSG\",\"3035\"]]";
 
+    /** Base CRS of the local Lambert-Equal Area projection */
     public static final String GEOGCS_4326 = "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,"
             + "AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],"
             + "UNIT[\"degree\",0.01745329251994328,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]";
 
+    /** Final WKT of the local Lambert-Equal Area projection */
     public static final String PROJ_4326 = PROJ_HEADER + GEOGCS_4326 + PROJ_FOOTER;
+
+    /** Default Pixel Area */
+    private static final double PIXEL_AREA = 400;
 
     /** Countdown latch used for handling various threads simultaneously */
     private CountDownLatch latch;
@@ -146,6 +160,13 @@ public class UrbanGridProcess implements GSProcess {
             throw new IllegalArgumentException("No input Coverage provided");
         }
 
+        double areaPx;
+        if (pixelArea == null) {
+            areaPx = PIXEL_AREA;
+        } else {
+            areaPx = pixelArea;
+        }
+
         // Number of Geometries
         int numThreads = rois.size();
         // Check if Geometry area or perimeter must be calculated
@@ -166,19 +187,19 @@ public class UrbanGridProcess implements GSProcess {
             // If index is 7a raster calculation can be executed
             if (subIndexA) {
                 return new CLCProcess().execute(referenceCoverage, nowCoverage, classes,
-                        CLCProcess.FIRST_INDEX, pixelArea, rois, null, null, true);
+                        CLCProcess.FIRST_INDEX, areaPx, rois, null, null, true);
             }
         case EIGHTH_INDEX:
             // Raster elaboration
-            return prepareImages(referenceCoverage, nowCoverage, rois, pixelArea * HACONVERTER);
+            return prepareImages(referenceCoverage, nowCoverage, rois, areaPx * HACONVERTER);
             // For the indexes 9-10 Zonal Stats are calculated
         case NINTH_INDEX:
             return new CLCProcess().execute(referenceCoverage, nowCoverage, classes,
-                    CLCProcess.THIRD_INDEX, pixelArea, rois, populations, Double.valueOf(1), null);
+                    CLCProcess.THIRD_INDEX, areaPx, rois, populations, Double.valueOf(1), null);
         case TENTH_INDEX:
             if (coeff != null) {
                 return new CLCProcess().execute(referenceCoverage, nowCoverage, classes,
-                        CLCProcess.THIRD_INDEX, pixelArea, rois, populations, coeff, null);
+                        CLCProcess.THIRD_INDEX, areaPx, rois, populations, coeff, null);
             } else {
                 throw new IllegalArgumentException("No coefficient provided for the selected index");
             }
@@ -619,16 +640,19 @@ public class UrbanGridProcess implements GSProcess {
      * Container class used for passing parameters between threads.
      */
     class ListContainer {
-
+        /** List containing all the polygon areas */
         private List<Double> list;
 
+        /** Sum of all the areas */
         private Double totalArea;
 
+        /** Sum of all the perimeters */
         private Double totalPerimeter;
 
         ListContainer() {
         }
 
+        /** Return a sorted list of areas */
         public List<Double> getSortedList() {
             return list;
         }

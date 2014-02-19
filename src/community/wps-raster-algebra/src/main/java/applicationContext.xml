@@ -6,7 +6,7 @@
 
 <beans>
 
-	<bean id="jiffleScript" class="org.geoserver.wps.gs.raster.algebra.JiffleScriptProcess" />
+	<bean id="jiffleScript" class="org.geoserver.wps.gs.soilsealing.JiffleScriptProcess" />
 
 	<!-- The PPIO that need to be registered into SPI because of their dependencies -->
 	
