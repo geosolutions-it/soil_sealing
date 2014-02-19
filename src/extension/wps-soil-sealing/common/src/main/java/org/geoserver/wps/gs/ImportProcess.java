@@ -92,13 +92,16 @@ public class ImportProcess implements GSProcess {
             }
         } else if (coverage != null) {
             // create a new coverage store
-            LOGGER.info("Auto-configuring coverage store: " + (name != null ? name : coverage.getName().toString()));
+            LOGGER.info("Auto-configuring coverage store: "
+                    + (name != null ? name : coverage.getName().toString()));
 
-            storeInfo = cb.buildCoverageStore((name != null ? name : coverage.getName().toString()));
+            storeInfo = cb
+                    .buildCoverageStore((name != null ? name : coverage.getName().toString()));
             store = (name != null ? name : coverage.getName().toString());
 
             if (storeInfo == null) {
-                throw new ProcessException("Could not find a default store in workspace " + ws.getName());
+                throw new ProcessException("Could not find a default store in workspace "
+                        + ws.getName());
             }
         }
 
@@ -112,9 +115,11 @@ public class ImportProcess implements GSProcess {
         }
 
         if (features != null) {
-            return new FeaturesImporter(this.catalog).execute(features, name, cb, ws, storeInfo, srs, srsHandling, targetStyle);
+            return new FeaturesImporter(this.catalog).execute(features, name, cb, ws, storeInfo,
+                    srs, srsHandling, targetStyle);
         } else if (coverage != null) {
-            return new CoverageImporter(this.catalog).execute(coverage, name, cb, ws, storeInfo, srs, srsHandling, targetStyle);
+            return new CoverageImporter(this.catalog).execute(coverage, name, cb, ws, storeInfo,
+                    srs, srsHandling, targetStyle);
         }
 
         return null;

@@ -9,7 +9,7 @@ import java.io.InputStream;
 import javax.xml.namespace.QName;
 
 import com.thoughtworks.xstream.XStream;
- 
+
 /**
  * 
  * 
@@ -17,19 +17,19 @@ import com.thoughtworks.xstream.XStream;
  * 
  */
 public class FeatureAttributePPIO extends XStreamPPIO {
- 
-	static final QName FeatureAttributeResults = new QName("FeatureAttributeResults");
-	
+
+    static final QName FeatureAttributeResults = new QName("FeatureAttributeResults");
+
     protected FeatureAttributePPIO() {
         super(FeatureAttribute.class, FeatureAttributeResults);
     }
 
-	@Override
-	public FeatureAttributePPIO decode(InputStream input) throws Exception {
-		// prepare xml encoding
+    @Override
+    public FeatureAttributePPIO decode(InputStream input) throws Exception {
+        // prepare xml encoding
         XStream xstream = buildXStream();
 
-		// write out FeatureAttributePPIO
+        // write out FeatureAttributePPIO
         return (FeatureAttributePPIO) xstream.fromXML(input);
-	}
+    }
 }

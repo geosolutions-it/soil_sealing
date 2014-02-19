@@ -35,58 +35,57 @@ import com.vividsolutions.jts.geom.Geometry;
 @DescribeProcess(title = "toFeature", description = "Transforms a map of KVP into a Feature.")
 public class ToFeature implements GSProcess {
 
-	@DescribeResult(name = "result", description = "The Simple Feature representing the Map of KVP")
-	public SimpleFeatureCollection execute(
-			@DescribeParameter(name = "geometry", description = "The feature geometry", min = 1) Geometry geometry,
-			@DescribeParameter(name = "crs", description = "The geometry CRS (if not already available)") CoordinateReferenceSystem crs,
-			@DescribeParameter(name = "typeName", description = "The generated feature type name", min = 1) String typeName,
-			@DescribeParameter(name = "attribute", description = "attribute KVP (name,value)", collectionType = FeatureAttribute.class, min = 1) List attribute,
-			ProgressListener progressListener)
-	throws ProcessException {
-		
-		// get the crs
-		if (crs == null) {
-			try {
-				crs = (CoordinateReferenceSystem) geometry.getUserData();
-			} catch (Exception e) {
-				// may not have a CRS attached
-			}
-		}
-		if (crs == null && geometry.getSRID() > 0) {
-			try {
-				crs = CRS.decode("EPSG:" + geometry.getSRID());
-			} catch (Exception e) {
-				// unable to find the CRS
-				throw new ProcessException(e);
-			}
-		}
+    @DescribeResult(name = "result", description = "The Simple Feature representing the Map of KVP")
+    public SimpleFeatureCollection execute(
+            @DescribeParameter(name = "geometry", description = "The feature geometry", min = 1) Geometry geometry,
+            @DescribeParameter(name = "crs", description = "The geometry CRS (if not already available)") CoordinateReferenceSystem crs,
+            @DescribeParameter(name = "typeName", description = "The generated feature type name", min = 1) String typeName,
+            @DescribeParameter(name = "attribute", description = "attribute KVP (name,value)", collectionType = FeatureAttribute.class, min = 1) List attribute,
+            ProgressListener progressListener) throws ProcessException {
 
-		// build the feature type
-		List<Object> values = new LinkedList<Object>();
-		SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
-		tb.setName(typeName);
-		tb.add("the_geom", geometry.getClass(), crs);
-		values.add(geometry);
+        // get the crs
+        if (crs == null) {
+            try {
+                crs = (CoordinateReferenceSystem) geometry.getUserData();
+            } catch (Exception e) {
+                // may not have a CRS attached
+            }
+        }
+        if (crs == null && geometry.getSRID() > 0) {
+            try {
+                crs = CRS.decode("EPSG:" + geometry.getSRID());
+            } catch (Exception e) {
+                // unable to find the CRS
+                throw new ProcessException(e);
+            }
+        }
 
-		for (Object att : attribute) {
-			if (att instanceof FeatureAttribute) {
-				tb.add((String) ((FeatureAttribute) att).getName(),
-						((FeatureAttribute) att).getValue().getClass());
-				values.add(((FeatureAttribute) att).getValue());
-			} else if (att instanceof HashMap) {
-				HashMap<String, Object> kvpMap = (HashMap<String, Object>) att;
-					tb.add((String) kvpMap.get("name"), kvpMap.get("value").getClass());
-					values.add(kvpMap.get("value"));
-			}
-		}
+        // build the feature type
+        List<Object> values = new LinkedList<Object>();
+        SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
+        tb.setName(typeName);
+        tb.add("the_geom", geometry.getClass(), crs);
+        values.add(geometry);
 
-		SimpleFeatureType schema = tb.buildFeatureType();
+        for (Object att : attribute) {
+            if (att instanceof FeatureAttribute) {
+                tb.add((String) ((FeatureAttribute) att).getName(), ((FeatureAttribute) att)
+                        .getValue().getClass());
+                values.add(((FeatureAttribute) att).getValue());
+            } else if (att instanceof HashMap) {
+                HashMap<String, Object> kvpMap = (HashMap<String, Object>) att;
+                tb.add((String) kvpMap.get("name"), kvpMap.get("value").getClass());
+                values.add(kvpMap.get("value"));
+            }
+        }
 
-		// build the feature
-		SimpleFeature sf = SimpleFeatureBuilder.build(schema, values, null);
-		ListFeatureCollection result = new ListFeatureCollection(schema);
-		result.add(sf);
-		return result;
-	}
+        SimpleFeatureType schema = tb.buildFeatureType();
+
+        // build the feature
+        SimpleFeature sf = SimpleFeatureBuilder.build(schema, values, null);
+        ListFeatureCollection result = new ListFeatureCollection(schema);
+        result.add(sf);
+        return result;
+    }
 
 }

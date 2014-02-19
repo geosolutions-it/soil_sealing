@@ -36,9 +36,9 @@ import org.opengis.feature.type.GeometryDescriptor;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 public class FeaturesImporter {
-    
+
     static final Logger LOGGER = Logging.getLogger(FeaturesImporter.class);
-            
+
     public Catalog catalog;
 
     public FeaturesImporter(Catalog catalog) {
@@ -59,16 +59,9 @@ public class FeaturesImporter {
      * @return
      * @throws ProcessException
      */
-    public String execute(
-            SimpleFeatureCollection features, 
-            String name,
-            CatalogBuilder cb, 
-            WorkspaceInfo ws,
-            StoreInfo storeInfo, 
-            CoordinateReferenceSystem srs, 
-            ProjectionPolicy srsHandling, 
-            StyleInfo targetStyle
-            ) throws ProcessException {
+    public String execute(SimpleFeatureCollection features, String name, CatalogBuilder cb,
+            WorkspaceInfo ws, StoreInfo storeInfo, CoordinateReferenceSystem srs,
+            ProjectionPolicy srsHandling, StyleInfo targetStyle) throws ProcessException {
         // check if the target layer and the target feature type are not
         // already there (this is a half-assed attempt as we don't have
         // an API telling us how the feature type name will be changed
@@ -163,7 +156,7 @@ public class FeaturesImporter {
                     "Failed to complete the import inside the GeoServer catalog", e);
         }
     }
-    
+
     /**
      * 
      * @param features
@@ -243,7 +236,7 @@ public class FeaturesImporter {
 
         return targetType;
     }
-    
+
     /**
      * Applies a set of heuristics to find which target attribute corresponds to a certain input attribute
      * 

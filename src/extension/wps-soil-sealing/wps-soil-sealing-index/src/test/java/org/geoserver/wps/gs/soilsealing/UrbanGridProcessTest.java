@@ -54,18 +54,18 @@ public class UrbanGridProcessTest {
     private static String pathToRefShp = "referenceCov.shp";
 
     private static String pathToCurShp = "nowCov.shp";
-    
-    
+
     @BeforeClass
-    public static void initialSetup() throws NoSuchAuthorityCodeException, FactoryException, IOException{
+    public static void initialSetup() throws NoSuchAuthorityCodeException, FactoryException,
+            IOException {
         crs = CRS.decode("EPSG:32632");
-        
+
         referenceCoverage = createImage(true);
         nowCoverage = createImage(false);
-        
+
         // Geometries in Raster space for indexes 7a-8-9-10
         geomListRaster = new ArrayList<Geometry>();
-        
+
         GeometryFactory fact = new GeometryFactory();
         Coordinate[] coordinates = new Coordinate[5];
         for (int i = 0; i < coordinates.length; i++) {
@@ -81,78 +81,71 @@ public class UrbanGridProcessTest {
         }
         LinearRing linear = new GeometryFactory().createLinearRing(coordinates);
         Polygon poly = new Polygon(linear, null, fact);
-        
+
         geomListRaster.add(poly);
-        
+
         // Geometries in UTM 32 N
         geomListUtm32N = new ArrayList<Geometry>();
-        
+
         Geometry geom = (Geometry) poly.clone();
-        
+
         geom.setSRID(32632);
         geomListUtm32N.add(poly);
-        
+
         urbanProcess = new UrbanGridProcess(pathToRefShp, pathToCurShp);
     }
-    
-    
-    
+
     @Test
     public void testIndex5() {
-        
+
     }
-    
+
     @Test
     public void testIndex5img2() {
-        
+
     }
 
     @Test
     public void testIndex6() {
-        
+
     }
-    
+
     @Test
     public void testIndex6img2() {
-        
+
     }
-    
+
     @Test
     public void testIndex7() {
-        
+
     }
-    
+
     @Test
     public void testIndex7img2() {
-        
+
     }
-    
+
     @Test
     public void testIndex8() {
-        
+
     }
-    
+
     @Test
     public void testIndex8img2() {
-        
+
     }
-    
+
     @Test
     public void testIndex9() {
-        
+
     }
-    
+
     @Test
     public void testIndex10() {
-        
+
     }
-    
-    
-    
-    
-    
-    
-    public static GridCoverage2D createImage(boolean reference){
+
+    public static GridCoverage2D createImage(boolean reference) {
 
         SampleModel sm = new ComponentSampleModel(DataBuffer.TYPE_BYTE, DEF_W, DEF_H, 1, DEF_W,
                 new int[] { 0 });
@@ -174,23 +167,23 @@ public class UrbanGridProcessTest {
             maxX = 20;
             minY = 10;
             maxY = 20;
-        }      
+        }
 
         int minPolStart = 0;
         int maxPolStart = 5;
-        
+
         for (int i = minPolStart; i < maxPolStart; i++) {
             for (int j = minPolStart; j < maxPolStart; j++) {
                 img.setSample(i, j, 0, 1);
             }
         }
-        
+
         for (int i = minX; i < maxX; i++) {
             for (int j = minY; j < maxY; j++) {
                 img.setSample(i, j, 0, 1);
             }
         }
-        
+
         Envelope envelope = new Envelope2D(crs, 0, 0, DEF_W, DEF_H);
 
         GridCoverage2D result = new GridCoverageFactory(GeoTools.getDefaultHints()).create("test",
@@ -198,5 +191,5 @@ public class UrbanGridProcessTest {
 
         return result;
     }
-    
+
 }

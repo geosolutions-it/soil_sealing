@@ -39,11 +39,9 @@ import com.sun.media.jai.util.ImageUtil;
 
 /**
  * 
- * A RenderedImage that provides values coming from a source GridCoverage2D, with a backing grid
- * addressable as the target GridCoverage2D.
+ * A RenderedImage that provides values coming from a source GridCoverage2D, with a backing grid addressable as the target GridCoverage2D.
  * <P>
- * The exposed Layout will be the same as the target, and each Point in the target grid can be used
- * in the resulting RenderedImage,
+ * The exposed Layout will be the same as the target, and each Point in the target grid can be used in the resulting RenderedImage,
  * 
  * 
  * @author ETj <etj at geo-solutions.it>
@@ -75,16 +73,11 @@ public class GridCoverage2DRIA extends GeometricOpImage {
 
     /**
      * Wrap the src coverage in the dst layout. <BR>
-     * The resulting RenderedImage will contain the data in src, and will be accessible via the grid
-     * specs of dst,
+     * The resulting RenderedImage will contain the data in src, and will be accessible via the grid specs of dst,
      * 
-     * @param src
-     *            the data coverage to be remapped on dst grid
-     * @param dst
-     *            the provider of the final grid
-     * @param nodata
-     *            the nodata value to set for cells not covered by src but included in dst. All
-     *            bands will share the same nodata value.
+     * @param src the data coverage to be remapped on dst grid
+     * @param dst the provider of the final grid
+     * @param nodata the nodata value to set for cells not covered by src but included in dst. All bands will share the same nodata value.
      * @return an instance of Coverage2RenderedImageAdapter
      */
     public static GridCoverage2DRIA create(final GridCoverage2D src, final GridCoverage2D dst,
@@ -193,16 +186,14 @@ public class GridCoverage2DRIA extends GeometricOpImage {
     }
 
     /**
-     * Returns the minimum bounding box of the region of the destination to which a particular
-     * <code>Rectangle</code> of the specified source will be mapped.
+     * Returns the minimum bounding box of the region of the destination to which a particular <code>Rectangle</code> of the specified source will be
+     * mapped.
      * 
      * <p>
-     * The integral source rectangle coordinates should be considered pixel indices. The "energy" of
-     * each pixel is defined to be concentrated in the continuous plane of pixels at an offset of
-     * (0.5,&nbsp;0.5) from the index of the pixel. Forward mappings must take this (0.5,&nbsp;0.5)
-     * pixel center into account. Thus given integral source pixel indices as input, the fractional
-     * destination location, as calculated by functions Xf(xSrc,&nbsp;ySrc), Yf(xSrc,&nbsp;ySrc), is
-     * given by:
+     * The integral source rectangle coordinates should be considered pixel indices. The "energy" of each pixel is defined to be concentrated in the
+     * continuous plane of pixels at an offset of (0.5,&nbsp;0.5) from the index of the pixel. Forward mappings must take this (0.5,&nbsp;0.5) pixel
+     * center into account. Thus given integral source pixel indices as input, the fractional destination location, as calculated by functions
+     * Xf(xSrc,&nbsp;ySrc), Yf(xSrc,&nbsp;ySrc), is given by:
      * 
      * <pre>
      * 
@@ -211,19 +202,13 @@ public class GridCoverage2DRIA extends GeometricOpImage {
      * 
      * </pre>
      * 
-     * @param sourceRect
-     *            the <code>Rectangle</code> in source coordinates.
-     * @param sourceIndex
-     *            the index of the source image.
+     * @param sourceRect the <code>Rectangle</code> in source coordinates.
+     * @param sourceIndex the index of the source image.
      * 
-     * @return a <code>Rectangle</code> indicating the destination bounding box, or
-     *         <code>null</code> if the bounding box is unknown.
+     * @return a <code>Rectangle</code> indicating the destination bounding box, or <code>null</code> if the bounding box is unknown.
      * 
-     * @throws IllegalArgumentException
-     *             if <code>sourceIndex</code> is negative or greater than the index of the last
-     *             source.
-     * @throws IllegalArgumentException
-     *             if <code>sourceRect</code> is <code>null</code>.
+     * @throws IllegalArgumentException if <code>sourceIndex</code> is negative or greater than the index of the last source.
+     * @throws IllegalArgumentException if <code>sourceRect</code> is <code>null</code>.
      */
     @Override
     protected Rectangle forwardMapRect(Rectangle pxRect, int i) {
@@ -294,16 +279,14 @@ public class GridCoverage2DRIA extends GeometricOpImage {
     }
 
     /**
-     * Returns the minimum bounding box of the region of the specified source to which a particular
-     * <code>Rectangle</code> of the destination will be mapped.
+     * Returns the minimum bounding box of the region of the specified source to which a particular <code>Rectangle</code> of the destination will be
+     * mapped.
      * 
      * <p>
-     * The integral destination rectangle coordinates should be considered pixel indices. The
-     * "energy" of each pixel is defined to be concentrated in the continuous plane of pixels at an
-     * offset of (0.5,&nbsp;0.5) from the index of the pixel. Backward mappings must take this
-     * (0.5,&nbsp;0.5) pixel center into account. Thus given integral destination pixel indices as
-     * input, the fractional source location, as calculated by functions Xb(xDst,&nbsp;yDst),
-     * Yb(xDst,&nbsp;yDst), is given by:
+     * The integral destination rectangle coordinates should be considered pixel indices. The "energy" of each pixel is defined to be concentrated in
+     * the continuous plane of pixels at an offset of (0.5,&nbsp;0.5) from the index of the pixel. Backward mappings must take this (0.5,&nbsp;0.5)
+     * pixel center into account. Thus given integral destination pixel indices as input, the fractional source location, as calculated by functions
+     * Xb(xDst,&nbsp;yDst), Yb(xDst,&nbsp;yDst), is given by:
      * 
      * <pre>
      * 
@@ -312,19 +295,13 @@ public class GridCoverage2DRIA extends GeometricOpImage {
      * 
      * </pre>
      * 
-     * @param destRect
-     *            the <code>Rectangle</code> in destination coordinates.
-     * @param sourceIndex
-     *            the index of the source image.
+     * @param destRect the <code>Rectangle</code> in destination coordinates.
+     * @param sourceIndex the index of the source image.
      * 
-     * @return a <code>Rectangle</code> indicating the source bounding box, or <code>null</code> if
-     *         the bounding box is unknown.
+     * @return a <code>Rectangle</code> indicating the source bounding box, or <code>null</code> if the bounding box is unknown.
      * 
-     * @throws IllegalArgumentException
-     *             if <code>sourceIndex</code> is negative or greater than the index of the last
-     *             source.
-     * @throws IllegalArgumentException
-     *             if <code>destRect</code> is <code>null</code>.
+     * @throws IllegalArgumentException if <code>sourceIndex</code> is negative or greater than the index of the last source.
+     * @throws IllegalArgumentException if <code>destRect</code> is <code>null</code>.
      */
     @Override
     protected Rectangle backwardMapRect(Rectangle destRect, int sourceIndex) {
@@ -450,9 +427,8 @@ public class GridCoverage2DRIA extends GeometricOpImage {
             maxX = src.getMaxX();
             minY = src.getMinY();
             maxY = src.getMaxY();
-            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad, src
-                    .getWidth()
-                    + lpad + rpad, src.getHeight() + tpad + bpad);
+            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad,
+                    src.getWidth() + lpad + rpad, src.getHeight() + tpad + bpad);
             iter = RandomIterFactory.create(src.getExtendedData(bounds, extender), bounds);
         } else {
             minX = src.getMinX() + lpad;
@@ -599,9 +575,8 @@ public class GridCoverage2DRIA extends GeometricOpImage {
             maxX = src.getMaxX();
             minY = src.getMinY();
             maxY = src.getMaxY();
-            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad, src
-                    .getWidth()
-                    + lpad + rpad, src.getHeight() + tpad + bpad);
+            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad,
+                    src.getWidth() + lpad + rpad, src.getHeight() + tpad + bpad);
             iter = RandomIterFactory.create(src.getExtendedData(bounds, extender), bounds);
         } else {
             minX = src.getMinX() + lpad;
@@ -700,9 +675,8 @@ public class GridCoverage2DRIA extends GeometricOpImage {
             maxX = src.getMaxX();
             minY = src.getMinY();
             maxY = src.getMaxY();
-            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad, src
-                    .getWidth()
-                    + lpad + rpad, src.getHeight() + tpad + bpad);
+            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad,
+                    src.getWidth() + lpad + rpad, src.getHeight() + tpad + bpad);
             iter = RandomIterFactory.create(src.getExtendedData(bounds, extender), bounds);
         } else {
             minX = src.getMinX() + lpad;
@@ -801,9 +775,8 @@ public class GridCoverage2DRIA extends GeometricOpImage {
             maxX = src.getMaxX();
             minY = src.getMinY();
             maxY = src.getMaxY();
-            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad, src
-                    .getWidth()
-                    + lpad + rpad, src.getHeight() + tpad + bpad);
+            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad,
+                    src.getWidth() + lpad + rpad, src.getHeight() + tpad + bpad);
             iter = RandomIterFactory.create(src.getExtendedData(bounds, extender), bounds);
         } else {
             minX = src.getMinX() + lpad;
@@ -902,9 +875,8 @@ public class GridCoverage2DRIA extends GeometricOpImage {
             maxX = src.getMaxX();
             minY = src.getMinY();
             maxY = src.getMaxY();
-            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad, src
-                    .getWidth()
-                    + lpad + rpad, src.getHeight() + tpad + bpad);
+            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad,
+                    src.getWidth() + lpad + rpad, src.getHeight() + tpad + bpad);
             iter = RandomIterFactory.create(src.getExtendedData(bounds, extender), bounds);
         } else {
             minX = src.getMinX() + lpad;
@@ -1000,9 +972,8 @@ public class GridCoverage2DRIA extends GeometricOpImage {
             maxX = src.getMaxX();
             minY = src.getMinY();
             maxY = src.getMaxY();
-            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad, src
-                    .getWidth()
-                    + lpad + rpad, src.getHeight() + tpad + bpad);
+            Rectangle bounds = new Rectangle(src.getMinX() - lpad, src.getMinY() - tpad,
+                    src.getWidth() + lpad + rpad, src.getHeight() + tpad + bpad);
             iter = RandomIterFactory.create(src.getExtendedData(bounds, extender), bounds);
         } else {
             minX = src.getMinX() + lpad;
@@ -1088,27 +1059,17 @@ public class GridCoverage2DRIA extends GeometricOpImage {
     }
 
     /**
-     * @param x0
-     *            The minimum X coordinate of the destination region.
-     * @param y0
-     *            The minimum Y coordinate of the destination region.
-     * @param width
-     *            The width of the destination region.
-     * @param height
-     *            The height of the destination region.
-     * @param periodX
-     *            The horizontal sampling period.
-     * @param periodY
-     *            The vertical sampling period.
+     * @param x0 The minimum X coordinate of the destination region.
+     * @param y0 The minimum Y coordinate of the destination region.
+     * @param width The width of the destination region.
+     * @param height The height of the destination region.
+     * @param periodX The horizontal sampling period.
+     * @param periodY The vertical sampling period.
      * 
-     * @param destRect
-     *            A <code>float</code> array containing at least
-     *            <code>2*((width+periodX-1)/periodX)*
-     *                ((height+periodY-1)/periodY)</code> elements, or <code>null</code>. If
-     *            <code>null</code>, a new array will be constructed.
+     * @param destRect A <code>float</code> array containing at least <code>2*((width+periodX-1)/periodX)*
+     *                ((height+periodY-1)/periodY)</code> elements, or <code>null</code>. If <code>null</code>, a new array will be constructed.
      * 
-     * @return A reference to the <code>destRect</code> parameter if it is non-<code>null</code>, or
-     *         a new <code>float</code> array otherwise.
+     * @return A reference to the <code>destRect</code> parameter if it is non-<code>null</code>, or a new <code>float</code> array otherwise.
      */
     public float[] warpSparseRect(int x0, int y0, int width, int height, int periodX, int periodY,
             float[] destRect) {
