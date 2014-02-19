@@ -325,41 +325,47 @@ public class UrbanGridProcess implements GSProcess {
         // Counter used for cycling on the Geometries
         int counter = 0;
         // Cycle on the urbanGrid results
-        for (ListContainer container : urbanGrids) {
-            // List of all the areas
-            List<Double> areas = container.getSortedList();
-            // Total polygon number except the biggest
-            int numPolyNotMax = areas.size() - 1;
-            // Area of the maximum polygon
-            double polyMaxArea = areas.get(numPolyNotMax);
-            // Calculation of the total urban area
-            double sut = container.getTotalArea();
-            // Calculation of the urban area without the maximum polygon area
-            double sud = sut - polyMaxArea;
-            // Calculation of the indexes
-            switch (index) {
-            case FIFTH_INDEX:
-                stats[counter] = sud / sut;
-                break;
-            case SIXTH_INDEX:
+        for (ListContainer container : urbanGrids) {           
+            
+            if(area){
+             // List of all the areas
+                List<Double> areas = container.getSortedList();
+             // Total polygon number except the biggest
+                int numPolyNotMax = areas.size() - 1;
+             // Area of the maximum polygon
+                double polyMaxArea = areas.get(numPolyNotMax);
+                // Calculation of the total urban area
+                double sut = container.getTotalArea();
+                // Calculation of the urban area without the maximum polygon area
+                double sud = sut - polyMaxArea;
+                
+             // Calculation of the indexes
+                switch (index) {
+                case FIFTH_INDEX:
+                    stats[counter] = sud / sut;
+                    break;
+                case SEVENTH_INDEX:
+                    // Check on the subIndex selected
+                    if (subIndexB) {
+                        stats[counter] = (polyMaxArea / sut) * 100;
+                    } else {
+                        stats[counter] = (sud / numPolyNotMax) * HACONVERTER;
+                    }
+                }                
+            }else{
                 // Selection of the Geometry
                 Geometry geo = rois.get(counter);
                 // Selection of the Geometry CRS
                 CoordinateReferenceSystem sourceCRS = CRS.decode("EPSG:" + geo.getSRID());
                 // Geometry reprojection
                 Geometry geoPrj = reprojectToEqualArea(sourceCRS, geo);
+                if(geoPrj==null){
+                    throw new ProcessException("Unable to reproject the input Administrative Geometry");
+                }
                 // Geometry Area
                 double areaAdmin = geoPrj.getArea();
                 // Index calculations
                 stats[counter] = (container.getTotalPerimeter() / areaAdmin) / HACONVERTER;
-                break;
-            case SEVENTH_INDEX:
-                // Check on the subIndex selected
-                if (subIndexB) {
-                    stats[counter] = (polyMaxArea / sut) * 100;
-                } else {
-                    stats[counter] = (sud / numPolyNotMax) * HACONVERTER;
-                }
             }
             // Counter update
             counter++;
@@ -412,6 +418,9 @@ public class UrbanGridProcess implements GSProcess {
 
         executor.awaitTermination(30, TimeUnit.SECONDS);
 
+        // Datastore disposal
+        dataStore.dispose();
+
         return allLists;
     }
 
@@ -430,9 +439,12 @@ public class UrbanGridProcess implements GSProcess {
         // Reproject to the Lambert Equal Area
         // Geometry center used for centering the reprojection on the Geometry(reduces distance artifacts)
         Point center = sourceGeometry.getCentroid();
+        // Creation of the MathTransform associated to the reprojection
+        MathTransform transPoint = CRS.findMathTransform(sourceCRS, CRS.decode("EPSG:4326"),true);
+        Point centerRP = (Point) JTS.transform(center, transPoint);
         // Creation of a wkt for the selected Geometry
-        String wkt = PROJ_4326.replace("%LAT0%", String.valueOf(center.getY()));
-        wkt = wkt.replace("%LON0%", String.valueOf(center.getX()));
+        String wkt = PROJ_4326.replace("%LAT0%", String.valueOf(centerRP.getX()));
+        wkt = wkt.replace("%LON0%", String.valueOf(centerRP.getY()));
         // Parsing of the selected WKT
         final CoordinateReferenceSystem targetCRS = CRS.parseWKT(wkt);
         // Creation of the MathTransform associated to the reprojection
@@ -580,6 +592,7 @@ public class UrbanGridProcess implements GSProcess {
             FeatureCollection coll = null;
             try {
                 coll = source.getFeatures(filter);
+                //coll = source.getFeatures();
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, e.getMessage());
                 throw new ProcessException(e);
@@ -603,10 +616,10 @@ public class UrbanGridProcess implements GSProcess {
                     SimpleFeature feature = (SimpleFeature) iter.next();
                     Geometry sourceGeometry = (Geometry) feature.getDefaultGeometry();
                     // If the geometry is a Polygon, then the operations are executed
-                    if (sourceGeometry instanceof Polygon) {
-                        // reprojection of the polygon
-                        Geometry geoPrj = reprojectToEqualArea(sourceCRS, sourceGeometry);
-                        // Area/Perimeter calculation
+                    // reprojection of the polygon
+                    Geometry geoPrj = reprojectToEqualArea(sourceCRS, sourceGeometry);
+                    // Area/Perimeter calculation
+                    if(geoPrj!=null){
                         if (area) {
                             double area = geoPrj.getArea();
                             areas.add(area);
@@ -615,6 +628,7 @@ public class UrbanGridProcess implements GSProcess {
                             totalPerimeter += geoPrj.getLength();
                         }
                     }
+
                 }
 
             } catch (Exception e) {
