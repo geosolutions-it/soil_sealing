@@ -9,13 +9,11 @@ import it.geosolutions.jaiext.changematrix.ChangeMatrixDescriptor.ChangeMatrix;
 import it.geosolutions.jaiext.changematrix.ChangeMatrixRIF;
 
 import java.awt.Point;
-import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -26,8 +24,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import javax.media.jai.JAI;
 import javax.media.jai.ParameterBlockJAI;
-import javax.media.jai.ROI;
-import javax.media.jai.ROIShape;
 import javax.media.jai.RenderedOp;
 
 import net.sf.json.JSONSerializer;
@@ -61,7 +57,6 @@ import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
-import org.geotools.geometry.jts.LiteShape2;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.image.jai.Registry;
 import org.geotools.process.ProcessException;
@@ -69,26 +64,16 @@ import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.process.gs.GSProcess;
-import org.geotools.process.raster.CoverageUtilities;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
-import org.geotools.referencing.operation.transform.ProjectiveTransform;
 import org.geotools.resources.image.ImageUtilities;
 import org.geotools.util.NullProgressListener;
-import org.geotools.utils.imageoverviews.OverviewsEmbedder;
-import org.geotools.utils.progress.ExceptionEvent;
-import org.geotools.utils.progress.ProcessingEvent;
-import org.geotools.utils.progress.ProcessingEventListener;
-import org.jaitools.imageutils.ROIGeometry;
 import org.opengis.coverage.grid.GridCoverageReader;
-import org.opengis.coverage.grid.GridEnvelope;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
 import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.parameter.GeneralParameterValue;
-import org.opengis.parameter.ParameterDescriptor;
-import org.opengis.parameter.ParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.datum.PixelInCell;
@@ -98,7 +83,6 @@ import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryCollection;
 import com.vividsolutions.jts.geom.GeometryFactory;
-import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geom.PrecisionModel;
 
@@ -209,7 +193,8 @@ public class ChangeMatrixProcess implements GSProcess {
                 if (roi instanceof GeometryCollection) {
                     List<Polygon> geomPolys = new ArrayList<Polygon>();
                     for (int g = 0; g < ((GeometryCollection) roi).getNumGeometries(); g++) {
-                        extractPolygons(geomPolys, ((GeometryCollection) roi).getGeometryN(g));
+                        CoverageUtilities.extractPolygons(geomPolys,
+                                ((GeometryCollection) roi).getGeometryN(g));
                     }
 
                     if (geomPolys.size() == 0) {
@@ -246,7 +231,7 @@ public class ChangeMatrixProcess implements GSProcess {
                 final CoordinateReferenceSystem crs = ciReference.getCRS();
                 if (CRS.equalsIgnoreMetadata(crs, DefaultGeographicCRS.WGS84)) {
                     roiPrj = roi;
-                    pbj.setParameter("ROI", CoverageUtilities.prepareROI(roi, gridToWorldCorner));
+                    pbj.setParameter("ROI", CoverageUtilities.prepareROI2(roi, gridToWorldCorner));
                 } else {
                     // reproject
                     MathTransform transform = CRS.findMathTransform(DefaultGeographicCRS.WGS84,
@@ -256,7 +241,8 @@ public class ChangeMatrixProcess implements GSProcess {
                     } else {
                         roiPrj = JTS.transform(roi, transform);
                     }
-                    pbj.setParameter("ROI", prepareROIGeometry(roiPrj, gridToWorldCorner));
+                    pbj.setParameter("ROI",
+                            CoverageUtilities.prepareROIGeometry(roiPrj, gridToWorldCorner));
                 }
                 //
                 // Make sure the provided area intersects the layer BBOX in the layer CRS
@@ -279,13 +265,15 @@ public class ChangeMatrixProcess implements GSProcess {
             }
 
             // merge filter
-            params = replaceParameter(params, referenceFilter, ImageMosaicFormat.FILTER);
+            params = CoverageUtilities.replaceParameter(params, referenceFilter,
+                    ImageMosaicFormat.FILTER);
             // merge USE_JAI_IMAGEREAD to false if needed
-            params = replaceParameter(params,
+            params = CoverageUtilities.replaceParameter(params,
                     ImageMosaicFormat.USE_JAI_IMAGEREAD.getDefaultValue(),
                     ImageMosaicFormat.USE_JAI_IMAGEREAD);
             if (gridROI != null) {
-                params = replaceParameter(params, gridROI, AbstractGridFormat.READ_GRIDGEOMETRY2D);
+                params = CoverageUtilities.replaceParameter(params, gridROI,
+                        AbstractGridFormat.READ_GRIDGEOMETRY2D);
             }
             referenceCoverage = (GridCoverage2D) referenceReader.read(params);
 
@@ -300,13 +288,15 @@ public class ChangeMatrixProcess implements GSProcess {
             params = CoverageUtils.getParameters(readParametersDescriptor, defaultParams, false);
 
             // merge filter
-            params = replaceParameter(params, nowFilter, ImageMosaicFormat.FILTER);
+            params = CoverageUtilities
+                    .replaceParameter(params, nowFilter, ImageMosaicFormat.FILTER);
             // merge USE_JAI_IMAGEREAD to false if needed
-            params = replaceParameter(params,
+            params = CoverageUtilities.replaceParameter(params,
                     ImageMosaicFormat.USE_JAI_IMAGEREAD.getDefaultValue(),
                     ImageMosaicFormat.USE_JAI_IMAGEREAD);
             if (gridROI != null) {
-                params = replaceParameter(params, gridROI, AbstractGridFormat.READ_GRIDGEOMETRY2D);
+                params = CoverageUtilities.replaceParameter(params, gridROI,
+                        AbstractGridFormat.READ_GRIDGEOMETRY2D);
             }
             // TODO add tiling, reuse standard values from config
             // TODO add background value, reuse standard values from config
@@ -449,7 +439,7 @@ public class ChangeMatrixProcess implements GSProcess {
             AbstractGridCoverage2DReader gtiffReader = null;
             try {
                 gtiffReader = new GeoTiffFormat().getReader(file);
-                generateOverviews(gtiffReader);
+                CoverageUtilities.generateOverviews(gtiffReader);
             } catch (DataSourceException e) {
                 // we tried, no need to fuss around this one
             }
@@ -549,63 +539,6 @@ public class ChangeMatrixProcess implements GSProcess {
     }
 
     /**
-     * Transform the provided {@link Geometry} in world coordinates into
-     * 
-     * @param roi
-     * @param gridToWorld
-     * @return
-     * @throws Exception
-     */
-    private static ROI prepareROI(Geometry roi, AffineTransform gridToWorld) throws Exception {
-        final Shape cropRoiLS2 = new LiteShape2(roi, ProjectiveTransform.create(gridToWorld)
-                .inverse(), null, true, 1);
-        return new ROIShape(cropRoiLS2);
-    }
-
-    /**
-     * Transform the provided {@link Geometry} in world coordinates into
-     * 
-     * @param roi
-     * @param gridToWorld
-     * @return
-     * @throws Exception
-     */
-    private static ROI prepareROIGeometry(Geometry roi, AffineTransform gridToWorld)
-            throws Exception {
-
-        Geometry projected = JTS.transform(roi, ProjectiveTransform.create(gridToWorld).inverse());
-
-        return new ROIGeometry(projected);
-    }
-
-    /**
-     * Replace or add the provided parameter in the read parameters
-     */
-    private <T> GeneralParameterValue[] replaceParameter(GeneralParameterValue[] readParameters,
-            Object value, ParameterDescriptor<T> pd) {
-
-        // scan all the params looking for the one we want to add
-        for (GeneralParameterValue gpv : readParameters) {
-            // in case of match of any alias add a param value to the lot
-            if (gpv.getDescriptor().getName().equals(pd.getName())) {
-                ((ParameterValue) gpv).setValue(value);
-                // leave
-                return readParameters;
-            }
-        }
-
-        // add it to the array
-        // add to the list
-        GeneralParameterValue[] readParametersClone = new GeneralParameterValue[readParameters.length + 1];
-        System.arraycopy(readParameters, 0, readParametersClone, 0, readParameters.length);
-        final ParameterValue<T> pv = pd.createValue();
-        pv.setValue(value);
-        readParametersClone[readParameters.length] = pv;
-        readParameters = readParametersClone;
-        return readParameters;
-    }
-
-    /**
      * @return an hardcoded ChangeMatrixOutput usefull for testing
      */
     private static final ChangeMatrixDTO getTestMap() {
@@ -645,108 +578,4 @@ public class ChangeMatrixProcess implements GSProcess {
         return s;
     }
 
-    /**
-     * @param geomPolys
-     * @param geom
-     */
-    public static void extractPolygons(Collection<Polygon> geomPolys, Geometry geom) {
-        if (geom instanceof MultiPolygon) {
-            for (int i = 0; i < ((MultiPolygon) geom).getNumGeometries(); i++) {
-                Geometry g = ((MultiPolygon) geom).getGeometryN(i);
-                if (g instanceof Polygon) {
-                    if (g.getGeometryType().compareToIgnoreCase("Polygon") == 0) {
-                        g.setSRID(geom.getSRID());
-                        geomPolys.add((Polygon) g);
-                    }
-                }
-            }
-        } else if (geom instanceof Polygon) {
-            if (geom.getGeometryType().compareToIgnoreCase("Polygon") == 0) {
-                geomPolys.add((Polygon) geom);
-            }
-        }
-    }
-
-    /**
-     * @param retValue
-     * @return the number of steps processed, or 0 if none was done, or -1 on error.
-     * @throws DataSourceException
-     */
-    public static int generateOverviews(AbstractGridCoverage2DReader abstractGridCoverage2DReader)
-            throws DataSourceException {
-        final File geotiffFile = (File) abstractGridCoverage2DReader.getSource();
-        // ////
-        // Adding Overviews
-        // ////
-
-        int tileH = 512;
-        int tileW = 512;
-
-        /** computing the number of steps **/
-        GridEnvelope gridRange = abstractGridCoverage2DReader.getOriginalGridRange();
-
-        int height = gridRange.getSpan(1);
-        int width = gridRange.getSpan(0);
-
-        int ratioH = (int) Math.ceil((1.0 * height) / tileH);
-        int ratioW = (int) Math.ceil((1.0 * width) / tileW);
-
-        int nStepsH = 0;
-        int nStepsW = 0;
-
-        if (ratioH >= 2) {
-            nStepsH = (int) Math.floor(Math.log(ratioH) / Math.log(2));
-        }
-
-        if (ratioW >= 2) {
-            nStepsW = (int) Math.floor(Math.log(ratioW) / Math.log(2));
-        }
-
-        int numSteps = Math.min(nStepsH, nStepsW);
-        int downSampleSteps = 2;
-
-        if (numSteps > 0) {
-            final OverviewsEmbedder oe = new OverviewsEmbedder();
-            oe.setDownsampleStep(downSampleSteps);
-            oe.setNumSteps(numSteps);
-            oe.setScaleAlgorithm(OverviewsEmbedder.SubsampleAlgorithm.Nearest.toString());
-            oe.setTileCache(JAI.getDefaultInstance().getTileCache());
-            // oe.setTileHeight(tileH);
-            // oe.setTileWidth(tileW);
-            oe.setSourcePath(geotiffFile.getAbsolutePath());
-
-            EmbedderListener listener = new EmbedderListener(geotiffFile.getAbsolutePath());
-            // add logger/listener
-            oe.addProcessingEventListener(listener);
-
-            // run
-            oe.run(); // should block until terminated
-            return listener.isSuccess() ? numSteps : -1;
-        } else
-            return 0;
-    }
-
-    static class EmbedderListener implements ProcessingEventListener {
-        final String filename;
-
-        boolean success = false;
-
-        public EmbedderListener(String filename) {
-            this.filename = filename;
-        }
-
-        public boolean isSuccess() {
-            return success;
-        }
-
-        public void exceptionOccurred(ExceptionEvent event) {
-            success = false;
-        }
-
-        public void getNotification(ProcessingEvent event) {
-            if (event.getPercentage() == 100.0) {
-                success = true;
-            }
-        }
-    }
 }
