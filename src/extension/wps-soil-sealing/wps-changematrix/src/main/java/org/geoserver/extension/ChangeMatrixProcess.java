@@ -1,6 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, available at the root
- * application directory.
+/* Copyright (c) 2001 - 2014 OpenPlans - www.openplans.org. All rights 
+ * reserved. This code is licensed under the GPL 2.0 license, available at the 
+ * root application directory.
  */
 package org.geoserver.extension;
 
@@ -8,6 +8,7 @@ import it.geosolutions.jaiext.changematrix.ChangeMatrixDescriptor;
 import it.geosolutions.jaiext.changematrix.ChangeMatrixDescriptor.ChangeMatrix;
 import it.geosolutions.jaiext.changematrix.ChangeMatrixRIF;
 
+import java.awt.Point;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.io.File;
@@ -20,27 +21,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import javax.media.jai.JAI;
+import javax.media.jai.ParameterBlockJAI;
 import javax.media.jai.ROI;
 import javax.media.jai.ROIShape;
 import javax.media.jai.RenderedOp;
 
 import net.sf.json.JSONSerializer;
 
+import org.apache.commons.io.FileUtils;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CoverageInfo;
-import org.geoserver.catalog.CoverageStoreInfo;
 import org.geoserver.config.CoverageAccessInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.data.util.CoverageUtils;
 import org.geoserver.wps.WPSException;
+import org.geoserver.wps.gs.CoverageImporter;
 import org.geoserver.wps.gs.ImportProcess;
 import org.geoserver.wps.gs.ToFeature;
 import org.geoserver.wps.gs.WFSLog;
 import org.geoserver.wps.ppio.FeatureAttribute;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -48,7 +53,11 @@ import org.geotools.data.DataSourceException;
 import org.geotools.data.collection.ListFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.factory.CommonFactoryFinder;
+import org.geotools.factory.GeoTools;
+import org.geotools.factory.Hints;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
+import org.geotools.gce.geotiff.GeoTiffFormat;
+import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
@@ -60,7 +69,7 @@ import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.process.gs.GSProcess;
-import org.geotools.process.raster.ChangeMatrixCoreProcess;
+import org.geotools.process.raster.CoverageUtilities;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geotools.referencing.operation.transform.ProjectiveTransform;
@@ -84,7 +93,6 @@ import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.datum.PixelInCell;
 import org.opengis.referencing.operation.MathTransform;
-import org.vfny.geoserver.global.GeoserverDataDirectory;
 
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
@@ -109,6 +117,8 @@ public class ChangeMatrixProcess implements GSProcess {
     }
 
     private final static boolean DEBUG = Boolean.getBoolean("org.geoserver.wps.debug");
+
+    private static final int PIXEL_MULTY_ARG_INDEX = 100;
 
     private static final FilterFactory ff = CommonFactoryFinder.getFilterFactory(null);
 
@@ -168,7 +178,6 @@ public class ChangeMatrixProcess implements GSProcess {
         SimpleFeatureCollection features = null;
         Filter filter = null;
         ToFeature toFeatureProcess = new ToFeature();
-
         WFSLog wfsLogProcess = new WFSLog(geoserver);
         // ///////////////////////////////////////////////
 
@@ -186,13 +195,14 @@ public class ChangeMatrixProcess implements GSProcess {
 
             // now perform the operation
             final ChangeMatrix cm = new ChangeMatrix(classes);
+            final ParameterBlockJAI pbj = new ParameterBlockJAI("ChangeMatrix");
+
+            pbj.setParameter("result", cm);
+            pbj.setParameter(
+                    ChangeMatrixDescriptor.PARAM_NAMES[ChangeMatrixDescriptor.PIXEL_MULTY_ARG_INDEX],
+                    PIXEL_MULTY_ARG_INDEX);
 
             GridGeometry2D gridROI = null;
-            // Geometry associated with the ROI
-            Geometry roiPrj = null;
-            // GridToWorldTransform used for ROI
-            final AffineTransform gridToWorldCorner;
-            boolean equalCRS = false;
 
             // handle Region Of Interest
             if (roi != null) {
@@ -223,18 +233,20 @@ public class ChangeMatrixProcess implements GSProcess {
                             roi.toText());
                 }
 
+                // Geometry associated with the ROI
+                Geometry roiPrj = null;
+
                 //
                 // GRID TO WORLD preparation from reference
                 //
-                gridToWorldCorner = (AffineTransform) ((GridGeometry2D) ciReference.getGrid())
-                        .getGridToCRS2D(PixelOrientation.UPPER_LEFT);
+                final AffineTransform gridToWorldCorner = (AffineTransform) ((GridGeometry2D) ciReference
+                        .getGrid()).getGridToCRS2D(PixelOrientation.UPPER_LEFT);
 
                 // check if we need to reproject the ROI from WGS84 (standard in the input) to the reference CRS
                 final CoordinateReferenceSystem crs = ciReference.getCRS();
-                equalCRS = CRS.equalsIgnoreMetadata(crs, DefaultGeographicCRS.WGS84);
-                if (equalCRS) {
+                if (CRS.equalsIgnoreMetadata(crs, DefaultGeographicCRS.WGS84)) {
                     roiPrj = roi;
-                    // pbj.setParameter("ROI", CoverageUtilities.prepareROI(roi, gridToWorldCorner));
+                    pbj.setParameter("ROI", CoverageUtilities.prepareROI(roi, gridToWorldCorner));
                 } else {
                     // reproject
                     MathTransform transform = CRS.findMathTransform(DefaultGeographicCRS.WGS84,
@@ -244,7 +256,7 @@ public class ChangeMatrixProcess implements GSProcess {
                     } else {
                         roiPrj = JTS.transform(roi, transform);
                     }
-                    // pbj.setParameter("ROI", prepareROIGeometry(roiPrj, gridToWorldCorner));
+                    pbj.setParameter("ROI", prepareROIGeometry(roiPrj, gridToWorldCorner));
                 }
                 //
                 // Make sure the provided area intersects the layer BBOX in the layer CRS
@@ -264,8 +276,6 @@ public class ChangeMatrixProcess implements GSProcess {
                 // Creation of a GridGeometry2D instance used for cropping the input images
                 gridROI = new GridGeometry2D(PixelInCell.CELL_CORNER,
                         (MathTransform) gridToWorldCorner, bounds, null);
-            } else {
-                gridToWorldCorner = null;
             }
 
             // merge filter
@@ -306,6 +316,10 @@ public class ChangeMatrixProcess implements GSProcess {
                 throw new WPSException("Input Current Coverage not found");
             }
 
+            // Setting of the sources
+            pbj.addSource(referenceCoverage.getRenderedImage());
+            pbj.addSource(nowCoverage.getRenderedImage());
+
             // //////////////////////////////////////////////////////////////////////
             // Logging to WFS ...
             // //////////////////////////////////////////////////////////////////////
@@ -340,7 +354,6 @@ public class ChangeMatrixProcess implements GSProcess {
              * LOG into the DB
              */
             filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
-
             features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true,
                     new NullProgressListener());
 
@@ -352,46 +365,115 @@ public class ChangeMatrixProcess implements GSProcess {
             // //////////////////////////////////////////////////////////////////////
             // Compute the Change Matrix ...
             // //////////////////////////////////////////////////////////////////////
+            result = JAI.create("ChangeMatrix", pbj, null);
 
+            //
+            // result computation
+            //
+            final int numTileX = result.getNumXTiles();
+            final int numTileY = result.getNumYTiles();
+            final int minTileX = result.getMinTileX();
+            final int minTileY = result.getMinTileY();
+            final List<Point> tiles = new ArrayList<Point>(numTileX * numTileY);
+            for (int i = minTileX; i < minTileX + numTileX; i++) {
+                for (int j = minTileY; j < minTileY + numTileY; j++) {
+                    tiles.add(new Point(i, j));
+                }
+            }
+            final CountDownLatch sem = new CountDownLatch(tiles.size());
             // how many JAI tiles do we have?
             final CoverageAccessInfo coverageAccess = geoserver.getGlobal().getCoverageAccess();
             final ThreadPoolExecutor executor = coverageAccess.getThreadPoolExecutor();
+            final RenderedOp temp = result;
+            for (final Point tile : tiles) {
 
-            final GridCoverage2D retValue = new ChangeMatrixCoreProcess().execute(
-                    referenceCoverage, nowCoverage, roiPrj, cm, gridToWorldCorner, equalCRS,
-                    ciReference.getName(), executor);
+                executor.execute(new Runnable() {
 
-            final String rasterName = retValue.getName().toString();
-
-            // //////////////////////////////////////////////////////////////////////
-            // Import into GeoServer the new Coverage 'retValue' ...
-            // //////////////////////////////////////////////////////////////////////
-
-            /**
-             * import the new coverage into the GeoServer catalog
-             */
-            ImportProcess importProcess = new ImportProcess(catalog);
-            importProcess.execute(null, retValue, wsName, null, retValue.getName().toString(),
-                    retValue.getCoordinateReferenceSystem(), null, defaultStyle);
-
-            /**
-             * Add Overviews...
-             */
-            CoverageStoreInfo importedCoverageInfo = catalog.getCoverageStoreByName(rasterName);
-            File tiffFile = GeoserverDataDirectory.findDataFile(importedCoverageInfo.getURL());
-            if (tiffFile != null && tiffFile.exists() && tiffFile.isFile() && tiffFile.canWrite()) {
-                try {
-                    generateOverviews(importedCoverageInfo.getFormat().getReader(tiffFile));
-                } catch (DataSourceException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+                    @Override
+                    public void run() {
+                        temp.getTile(tile.x, tile.y);
+                        sem.countDown();
+                    }
+                });
             }
+            try {
+                sem.await();
+            } catch (InterruptedException e) {
+                // TODO handle error
+                return null;
+            }
+            // computation done!
+            cm.freeze();
+
+            // //////////////////////////////////////////////////////////////////////
+            // Import into GeoServer the new raster 'result' ...
+            // //////////////////////////////////////////////////////////////////////
+            /**
+             * create the final coverage using final envelope
+             */
+            // hints for tiling
+            final Hints hints = GeoTools.getDefaultHints().clone();
+
+            final String rasterName = ciReference.getName() + "_cm_" + System.nanoTime();
+            final GridCoverage2D retValue = new GridCoverageFactory(hints).create(rasterName,
+                    result, referenceCoverage.getEnvelope());
 
             /**
              * creating the ChangeMatrix grid
              */
             final ChangeMatrixDTO changeMatrix = new ChangeMatrixDTO(cm, classes, rasterName);
+
+            /**
+             * Add Overviews...
+             */
+            final File file = File.createTempFile(retValue.getName().toString(), ".tif");
+            GeoTiffWriter writer = new GeoTiffWriter(file);
+
+            // setting the write parameters for this geotiff
+            final ParameterValueGroup gtiffParams = new GeoTiffFormat().getWriteParameters();
+            gtiffParams.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString())
+                    .setValue(CoverageImporter.DEFAULT_WRITE_PARAMS);
+            final GeneralParameterValue[] wps = (GeneralParameterValue[]) gtiffParams.values()
+                    .toArray(new GeneralParameterValue[1]);
+
+            try {
+                writer.write(retValue, wps);
+            } finally {
+                try {
+                    writer.dispose();
+                } catch (Exception e) {
+                    throw new IOException("Unable to write the output raster.", e);
+                }
+            }
+
+            AbstractGridCoverage2DReader gtiffReader = null;
+            try {
+                gtiffReader = new GeoTiffFormat().getReader(file);
+                generateOverviews(gtiffReader);
+            } catch (DataSourceException e) {
+                // we tried, no need to fuss around this one
+            }
+
+            /**
+             * import the new coverage into the GeoServer catalog
+             */
+            try {
+                ImportProcess importProcess = new ImportProcess(catalog);
+                GridCoverage2D retOvValue = gtiffReader.read(wps);
+                importProcess.execute(null, retOvValue, wsName, null,
+                        retValue.getName().toString(), retValue.getCoordinateReferenceSystem(),
+                        null, defaultStyle);
+            } finally {
+                if (gtiffReader != null) {
+                    gtiffReader.dispose();
+                }
+
+                try {
+                    FileUtils.forceDelete(file);
+                } catch (Exception e) {
+                    // we tried, no need to fuss around this one
+                }
+            }
 
             // //////////////////////////////////////////////////////////////////////
             // Updating WFS ...
