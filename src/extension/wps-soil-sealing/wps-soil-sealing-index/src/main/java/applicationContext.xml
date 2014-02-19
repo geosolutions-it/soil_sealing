@@ -5,7 +5,7 @@
 
 	<bean id="clcProcess" class="org.geoserver.wps.gs.soilsealing.CLCProcess" />
 
-	<bean id="urbanGridProcess" class="org.geoserver.wps.gs.soilsealing.UrbanGridProcess"			
+	<bean id="urbanGridProcess" class="org.geoserver.wps.gs.soilsealing.UrbanGridProcess">		
 		<constructor-arg index="0" value="shapefileReferencePath" />
 		<constructor-arg index="1" value="shapefileCurrentPath" />
 	</bean>
