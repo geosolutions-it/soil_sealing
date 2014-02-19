@@ -30,21 +30,21 @@ import com.vividsolutions.jts.geom.Polygon;
 
 public class CLCProcessTest {
 
-    private static final int DEF_H = 256;
+    public static final int DEF_H = 256;
 
-    private static final int DEF_W = 256;
+    public static final int DEF_W = 256;
 
-    private static final int DEF_TILE_H = 32;
+    public static final int DEF_TILE_H = 32;
 
-    private static final int DEF_TILE_W = 32;
+    public static final int DEF_TILE_W = 32;
 
-    private static final double AREA = CLCProcess.PIXEL_AREA;
+    public static final double AREA = CLCProcess.PIXEL_AREA;
 
-    private static final int DEFAULT_POP_REF = 10;
+    public static final int DEFAULT_POP_REF = 10;
 
-    private static final int DEFAULT_POP_NOW = 20;
+    public static final int DEFAULT_POP_NOW = 20;
 
-    private static final double DELTA = 0.0001;
+    public static final double DELTA = 0.0001;
 
     private static GridCoverage2D reference;
 

@@ -37,21 +37,21 @@ import com.vividsolutions.jts.geom.Geometry;
  * 
  */
 public class CLCProcess implements GSProcess {
-
+    /** Constant associated to the 0th idx*/
     private static final int ZERO_IDX = 0;
-
+    /** Constant associated to the 1st idx*/
     public static final int FIRST_INDEX = 1;
-
+    /** Constant associated to the 2nd idx*/
     public static final int SECOND_INDEX = 2;
-
+    /** Constant associated to the 3rd idx*/
     public static final int THIRD_INDEX = 3;
-
+    /** Constant associated to the 4th idx*/
     public static final int FOURTH_INDEX = 4;
-
+    /**Default pixel area*/
     public static final double PIXEL_AREA = 10000;
-
+    /** Upper Bound used for index 4*/ 
     public static final double UPPER_BOUND_INDEX_4 = 1.5d;
-
+    /** Lower Bound used for index 4*/
     public static final double LOWER_BOUND_INDEX_4 = 0.5d;
 
     /**
