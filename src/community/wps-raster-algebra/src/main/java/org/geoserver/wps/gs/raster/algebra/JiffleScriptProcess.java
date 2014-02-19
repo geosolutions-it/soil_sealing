@@ -2,7 +2,7 @@
  * reserved. This code is licensed under the GPL 2.0 license, available at the 
  * root application directory.
  */
-package org.geoserver.wps.gs.soilsealing;
+package org.geoserver.wps.gs.raster.algebra;
 
 import java.awt.image.DataBuffer;
 import java.awt.image.RenderedImage;

@@ -2,7 +2,7 @@
  * reserved. This code is licensed under the GPL 2.0 license, available at the 
  * root application directory.
  */
-package org.geoserver.wps.gs.soilsealing;
+package org.geoserver.wps.gs.raster.algebra;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
@@ -26,8 +26,8 @@ import javax.media.jai.operator.BandMergeDescriptor;
 import org.apache.commons.io.FileUtils;
 import org.geoserver.data.test.SystemTestData;
 import org.geoserver.wps.WPSTestSupport;
-import org.geoserver.wps.gs.soilsealing.JiffleScriptListProcess;
-import org.geoserver.wps.gs.soilsealing.JiffleScriptProcess;
+import org.geoserver.wps.gs.raster.algebra.JiffleScriptListProcess;
+import org.geoserver.wps.gs.raster.algebra.JiffleScriptProcess;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.gce.geotiff.GeoTiffFormat;
