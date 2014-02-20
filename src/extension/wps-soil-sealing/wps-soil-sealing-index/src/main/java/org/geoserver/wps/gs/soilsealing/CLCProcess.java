@@ -113,12 +113,7 @@ public class CLCProcess implements GSProcess {
 
         // Control on the population number for the 3° and 4° indexes
         int numAreas = rois.size();
-        int numPop = populations.size();
-        if (numPop < 2 && (index == THIRD_INDEX || index == FOURTH_INDEX)) {
-            throw new IllegalArgumentException("Some Populations are not present");
-        }
-        int numPopRef = populations.get(ZERO_IDX).size();
-        int numPopNow = populations.get(1).size();
+
 
         // PixelArea value
         double area = 0;
@@ -143,6 +138,15 @@ public class CLCProcess implements GSProcess {
             break;
         case THIRD_INDEX:
         case FOURTH_INDEX:
+            int numPop = 0;
+            if(populations!=null){
+                numPop = populations.size();
+            }        
+            if (populations==null || numPop < 2 ) {
+                throw new IllegalArgumentException("Some Populations are not present");
+            }
+            int numPopRef = populations.get(ZERO_IDX).size();
+            int numPopNow = populations.get(1).size();
             if (numAreas != numPopRef || numAreas != numPopNow) {
                 throw new IllegalArgumentException("Some Areas or Populations are not present");
             }
