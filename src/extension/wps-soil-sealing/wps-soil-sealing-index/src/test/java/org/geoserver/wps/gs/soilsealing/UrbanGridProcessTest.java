@@ -1,7 +1,16 @@
 package org.geoserver.wps.gs.soilsealing;
 
+import it.geosolutions.jaiext.algebra.AlgebraDescriptor;
+import it.geosolutions.jaiext.algebra.AlgebraDescriptor.Operator;
+import it.geosolutions.jaiext.buffer.BufferDescriptor;
+import it.geosolutions.jaiext.stats.Statistics;
+import it.geosolutions.jaiext.stats.Statistics.StatsType;
+import it.geosolutions.jaiext.stats.StatisticsDescriptor;
+
+import java.awt.RenderingHints;
 import java.awt.image.ComponentSampleModel;
 import java.awt.image.DataBuffer;
+import java.awt.image.RenderedImage;
 import java.awt.image.SampleModel;
 import java.io.File;
 import java.io.IOException;
@@ -9,17 +18,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
+import javax.media.jai.ROI;
+import javax.media.jai.RenderedOp;
 import javax.media.jai.TiledImage;
 
 import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
-import org.geoserver.wps.gs.soilsealing.UrbanGridProcess;
-import org.geoserver.wps.gs.soilsealing.UrbanGridProcess.ListContainer;
-import org.geoserver.wps.gs.soilsealing.UrbanGridProcess.MyRunnable;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.data.DataStore;
@@ -29,13 +33,14 @@ import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.GeoTools;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
-import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.process.ProcessException;
 import org.geotools.referencing.CRS;
 import org.geotools.test.TestData;
+import org.jaitools.imageutils.ROIGeometry;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -67,9 +72,7 @@ public class UrbanGridProcessTest {
 
     public static final int DEF_TILE_W = 32;
 
-    public static final double DELTA = 0.0001;
-    
-    private static final String ECKERTIVWKT = "PROJCS[\"World_Eckert_IV\",GEOGCS[\"GCS_WGS_1984\",DATUM[\"D_WGS_1984\",SPHEROID[\"WGS_1984\",6378137.0,298.257223563]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Eckert_IV\"],PARAMETER[\"Central_Meridian\",0.0],UNIT[\"Meter\",1.0]]";
+    public static final double DELTA = 0.1;
 
     private static CoordinateReferenceSystem crs;
 
@@ -103,6 +106,18 @@ public class UrbanGridProcessTest {
 
     private static double totalAreaCur;
 
+    private static double converter;
+
+    private static double rasterGeoArea;
+
+    private static double multiplier;
+
+    private static List<List<Integer>> populations;
+
+    public static final int DEFAULT_POP_REF = 10;
+
+    public static final int DEFAULT_POP_NOW = 20;
+
     @BeforeClass
     public static void initialSetup() throws NoSuchAuthorityCodeException, FactoryException,
             IOException {
@@ -134,8 +149,7 @@ public class UrbanGridProcessTest {
 
         // Geometries in UTM 32 N
         geomListUtm32N = new ArrayList<Geometry>();
-        
-        
+
         Coordinate[] coordinates2 = new Coordinate[5];
         for (int i = 0; i < coordinates2.length; i++) {
             if (i == 0 || i == 4) {
@@ -156,25 +170,42 @@ public class UrbanGridProcessTest {
 
         urbanProcess = new UrbanGridProcess(pathToRefShp, pathToCurShp);
 
-        //HAConverter
-        double converter = UrbanGridProcess.HACONVERTER;
-        
+        // HAConverter
+        converter = UrbanGridProcess.HACONVERTER;
+
+        // Raster Geometry Area
+        // rasterGeoArea = (DEF_W / 2 - 1)*(DEF_H / 2 - 1)*converter;
+        rasterGeoArea = poly.getArea() * converter;
+
         // Reference
-        totalAreaRef = 125*converter;
+        totalAreaRef = 125 * converter;
         areasRef = new ArrayList<Double>(2);
-        areasRef.add(25d*converter);
-        areasRef.add(100d*converter);
+        areasRef.add(25d * converter);
+        areasRef.add(100d * converter);
         calculatePerimeters(poly2, true);
         // Current
-        totalAreaCur = 115*converter;
+        totalAreaCur = 115 * converter;
         areasCur = new ArrayList<Double>(2);
-        areasCur.add(25d*converter);
-        areasCur.add(90d*converter);
+        areasCur.add(25d * converter);
+        areasCur.add(90d * converter);
         calculatePerimeters(poly2, false);
+
+        // Index 10 fake multiplier
+        multiplier = 20d;
+
+        // Pops
+        populations = new ArrayList<List<Integer>>(2);
+        List<Integer> popref = new ArrayList<Integer>(1);
+        popref.add(DEFAULT_POP_REF);
+        populations.add(popref);
+
+        List<Integer> popnow = new ArrayList<Integer>(1);
+        popnow.add(DEFAULT_POP_NOW);
+        populations.add(popnow);
     }
 
     @Test
-    public void testIndex5() throws Exception {
+    public void testIndex5() {
         List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, null, 5, null,
                 null, geomListUtm32N, null, null);
 
@@ -189,9 +220,9 @@ public class UrbanGridProcessTest {
     }
 
     @Test
-    public void testIndex5img2() throws Exception {
-        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 5, null,
-                null, geomListUtm32N, null, null);
+    public void testIndex5img2() {
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 5,
+                null, null, geomListUtm32N, null, null);
 
         // Expected results Reference
         double sutRef = totalAreaRef;
@@ -201,7 +232,7 @@ public class UrbanGridProcessTest {
         double calculatedRef = results.get(0).getResultsRef()[0];
 
         Assert.assertEquals(expectedRef, calculatedRef, DELTA);
-        
+
         // Expected results Current
         double sutCur = totalAreaCur;
         double sudCur = totalAreaCur - areasCur.get(areasCur.size() - 1);
@@ -216,45 +247,311 @@ public class UrbanGridProcessTest {
     public void testIndex6() throws Exception {
         List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, null, 6, null,
                 null, geomListUtm32N, null, null);
-        
-        
-        
+        // Expected Result Reference
+        Geometry geoRpj = reprojectToEqualArea(crs, geomListUtm32N.get(0));
+        double adminArea = geoRpj.getArea() * converter;
+        double expectedRef = totalPerimeterRef / adminArea;
 
+        double calculatedRef = results.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRef, calculatedRef, DELTA);
     }
 
     @Test
     public void testIndex6img2() throws Exception {
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 6,
+                null, null, geomListUtm32N, null, null);
+        // Expected Result Reference
+        Geometry geoRpj = reprojectToEqualArea(crs, geomListUtm32N.get(0));
+        double adminArea = geoRpj.getArea() * converter;
+        double expectedRef = totalPerimeterRef / adminArea;
 
+        double calculatedRef = results.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRef, calculatedRef, DELTA);
+
+        // Expected Result Current
+        double expectedCur = totalPerimeterCur / adminArea;
+
+        double calculatedCur = results.get(0).getResultsNow()[0];
+
+        Assert.assertEquals(expectedCur, calculatedCur, DELTA);
     }
 
     @Test
-    public void testIndex7() throws Exception {
+    public void testIndex7() {
+        // Index 7a
+        List<StatisticContainer> resultsA = urbanProcess.execute(referenceCoverage, null, 7, "a",
+                1d, geomListRaster, null, null);
 
+        double expectedRefA = totalAreaRef / rasterGeoArea * 100;
+
+        double calculatedRefA = resultsA.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRefA, calculatedRefA, DELTA);
+
+        // Index 7b
+
+        List<StatisticContainer> resultsB = urbanProcess.execute(referenceCoverage, null, 7, "b",
+                1d, geomListUtm32N, null, null);
+
+        double polyMaxArea = areasRef.get(areasRef.size() - 1);
+
+        double expectedRefB = polyMaxArea / totalAreaRef * 100;
+
+        double calculatedRefB = resultsB.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRefB, calculatedRefB, DELTA);
+        // Index 7c
+        List<StatisticContainer> resultsC = urbanProcess.execute(referenceCoverage, null, 7, "c",
+                1d, geomListUtm32N, null, null);
+
+        double polyAreaNotMax = totalAreaRef - polyMaxArea;
+
+        double expectedRefC = polyAreaNotMax / (areasRef.size() - 1);
+
+        double calculatedRefC = resultsC.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRefC, calculatedRefC, DELTA);
     }
 
     @Test
-    public void testIndex7img2() throws Exception {
+    public void testIndex7img2() {
+        // Index 7a
+        List<StatisticContainer> resultsA = urbanProcess.execute(referenceCoverage, nowCoverage, 7,
+                "a", 1d, geomListRaster, null, null);
+        // reference
+        double expectedRefA = totalAreaRef / rasterGeoArea * 100;
 
+        double calculatedRefA = resultsA.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRefA, calculatedRefA, DELTA);
+
+        // current
+        double expectedCurA = totalAreaCur / rasterGeoArea * 100;
+
+        double calculatedCurA = resultsA.get(0).getResultsNow()[0];
+
+        Assert.assertEquals(expectedCurA, calculatedCurA, DELTA);
+
+        // Index 7b
+
+        List<StatisticContainer> resultsB = urbanProcess.execute(referenceCoverage, nowCoverage, 7,
+                "b", 1d, geomListUtm32N, null, null);
+        // reference
+        double polyMaxAreaRef = areasRef.get(areasRef.size() - 1);
+
+        double expectedRefB = polyMaxAreaRef / totalAreaRef * 100;
+
+        double calculatedRefB = resultsB.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRefB, calculatedRefB, DELTA);
+
+        // current
+        double polyMaxAreaCur = areasCur.get(areasCur.size() - 1);
+
+        double expectedCurB = polyMaxAreaCur / totalAreaCur * 100;
+
+        double calculatedCurB = resultsB.get(0).getResultsNow()[0];
+
+        Assert.assertEquals(expectedCurB, calculatedCurB, DELTA);
+
+        // Index 7c
+        List<StatisticContainer> resultsC = urbanProcess.execute(referenceCoverage, nowCoverage, 7,
+                "c", 1d, geomListUtm32N, null, null);
+
+        // reference
+        double polyAreaNotMaxRef = totalAreaRef - polyMaxAreaRef;
+
+        double expectedRefC = polyAreaNotMaxRef / (areasRef.size() - 1);
+
+        double calculatedRefC = resultsC.get(0).getResultsRef()[0];
+
+        Assert.assertEquals(expectedRefC, calculatedRefC, DELTA);
+
+        // current
+        double polyAreaNotMaxCur = totalAreaCur - polyMaxAreaCur;
+
+        double expectedCurC = polyAreaNotMaxCur / (areasCur.size() - 1);
+
+        double calculatedCurC = resultsC.get(0).getResultsNow()[0];
+
+        Assert.assertEquals(expectedCurC, calculatedCurC, DELTA);
     }
 
     @Test
-    public void testIndex8() throws Exception {
+    public void testIndex8() {
+        // Selections of the Hints to use
+        RenderingHints hints = GeoTools.getDefaultHints().clone();
+        int padding = 10;
+        double destNoData = 0;
+        double pixelArea = 1d;
 
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, null, 8, null,
+                pixelArea, geomListRaster, null, null);
+
+        List<ROI> rois = new ArrayList<ROI>(geomListRaster.size());
+
+        for (Geometry geom : geomListRaster) {
+            rois.add(new ROIGeometry(geom));
+        }
+
+        RenderedOp referenceExpected = BufferDescriptor.create(
+                referenceCoverage.getRenderedImage(), BufferDescriptor.DEFAULT_EXTENDER, padding,
+                padding, padding, padding, rois, null, destNoData, null, DataBuffer.TYPE_DOUBLE,
+                pixelArea * converter, hints);
+
+        RenderedImage referenceCalculated = results.get(0).getReferenceImage();
+        // Check if the image is present
+        Assert.assertNotNull(referenceCalculated);
+        // Calculation of the variation between current and reference images
+        RenderedOp diff = AlgebraDescriptor.create(Operator.SUBTRACT, null, null, destNoData,
+                hints, referenceExpected, referenceCalculated);
+        int[] bands = new int[] { 0 };
+        int period = 1;
+        StatsType[] stats = new StatsType[] { StatsType.MEAN };
+        RenderedOp statsIMG = StatisticsDescriptor.create(diff, period, period, null, null, false,
+                bands, stats, hints);
+
+        Statistics[][] values = (Statistics[][]) statsIMG.getProperty(Statistics.STATS_PROPERTY);
+
+        double meanCalculated = (Double) values[0][0].getResult();
+        double meanExpected = 0;
+
+        Assert.assertEquals(meanExpected, meanCalculated, DELTA);
     }
 
     @Test
-    public void testIndex8img2() throws Exception {
+    public void testIndex8img2() {
+     // Selections of the Hints to use
+        RenderingHints hints = GeoTools.getDefaultHints().clone();
+        int padding = 10;
+        double destNoData = 0;
+        double pixelArea = 1d;
 
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 8, null,
+                pixelArea, geomListRaster, null, null);
+
+        RenderedImage referenceCalculated = results.get(0).getReferenceImage();
+        RenderedImage currentCalculated = results.get(0).getNowImage();
+        RenderedImage diffCalculated = results.get(0).getDiffImage();
+        // Check if the image is present
+        Assert.assertNotNull(referenceCalculated);
+        Assert.assertNotNull(currentCalculated);
+        Assert.assertNotNull(diffCalculated);
+        
+        List<ROI> rois = new ArrayList<ROI>(geomListRaster.size());
+
+        for (Geometry geom : geomListRaster) {
+            rois.add(new ROIGeometry(geom));
+        }
+
+        int[] bands = new int[] { 0 };
+        int period = 1;
+        StatsType[] stats = new StatsType[] { StatsType.MEAN };
+        
+        // Reference
+        RenderedOp referenceExpected = BufferDescriptor.create(
+                referenceCoverage.getRenderedImage(), BufferDescriptor.DEFAULT_EXTENDER, padding,
+                padding, padding, padding, rois, null, destNoData, null, DataBuffer.TYPE_DOUBLE,
+                pixelArea * converter, hints);
+        
+        // Calculation of the variation between current and reference images
+        RenderedOp diff = AlgebraDescriptor.create(Operator.SUBTRACT, null, null, destNoData,
+                hints, referenceExpected, referenceCalculated);
+        
+        RenderedOp statsIMG = StatisticsDescriptor.create(diff, period, period, null, null, false,
+                bands, stats, hints);
+
+        Statistics[][] values = (Statistics[][]) statsIMG.getProperty(Statistics.STATS_PROPERTY);
+
+        double meanCalculated = (Double) values[0][0].getResult();
+        double meanExpected = 0;
+
+        Assert.assertEquals(meanExpected, meanCalculated, DELTA);
+        
+        // Current
+        
+        RenderedOp currentExpected = BufferDescriptor.create(
+                nowCoverage.getRenderedImage(), BufferDescriptor.DEFAULT_EXTENDER, padding,
+                padding, padding, padding, rois, null, destNoData, null, DataBuffer.TYPE_DOUBLE,
+                pixelArea * converter, hints);
+        
+     // Calculation of the variation between current and reference images
+        RenderedOp diffCur = AlgebraDescriptor.create(Operator.SUBTRACT, null, null, destNoData,
+                hints, currentExpected, currentCalculated);
+        
+        RenderedOp statsIMGCur = StatisticsDescriptor.create(diffCur, period, period, null, null, false,
+                bands, stats, hints);
+
+        Statistics[][] valuesCur = (Statistics[][]) statsIMGCur.getProperty(Statistics.STATS_PROPERTY);
+
+        double meanCalculatedCur = (Double) valuesCur[0][0].getResult();
+        double meanExpectedCur = 0;
+
+        Assert.assertEquals(meanExpectedCur, meanCalculatedCur, DELTA);
     }
 
     @Test
-    public void testIndex9() throws Exception {
+    public void testIndex9() {
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 9,
+                null, 1d, geomListRaster, populations, null);
 
+        double areaDiff = totalAreaCur - totalAreaRef;
+        double deltaPop = DEFAULT_POP_NOW - DEFAULT_POP_REF;
+
+        double expected = areaDiff / deltaPop;
+
+        double calculated = results.get(0).getResults()[0];
+
+        Assert.assertEquals(expected, calculated, DELTA);
     }
 
     @Test
-    public void testIndex10() throws Exception {
+    public void testIndex10() {
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 10,
+                null, 1d, geomListRaster, populations, multiplier);
 
+        double areaDiff = totalAreaCur - totalAreaRef;
+        double deltaPop = DEFAULT_POP_NOW - DEFAULT_POP_REF;
+
+        double expected = areaDiff / deltaPop * multiplier;
+
+        double calculated = results.get(0).getResults()[0];
+
+        Assert.assertEquals(expected, calculated, DELTA);
+    }
+
+    // EXCEPTION TESTS
+    @Test(expected=IllegalArgumentException.class)
+    public void testNoCoverages(){
+        List<StatisticContainer> results = urbanProcess.execute(null, null, 10,
+                null, 1d, geomListRaster, populations, multiplier);
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testWrongSubId(){
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, null, 7,
+                "d", 1d, geomListRaster, populations, multiplier);
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testWrongIndex(){
+        List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, null, 11,
+                "d", 1d, geomListRaster, populations, multiplier);
+    }
+    
+    @Test(expected = ProcessException.class)
+    public void testNoDatastore(){
+        List<StatisticContainer> results = new UrbanGridProcess(refShp, curShp).execute(referenceCoverage, null, 5,
+                null, 1d, geomListUtm32N, null, null);
+    }
+    
+    
+    @AfterClass
+    public static void finalDispose() {
+        referenceCoverage.dispose(true);
+        nowCoverage.dispose(true);
     }
 
     public static GridCoverage2D createImage(boolean reference) {
@@ -304,8 +601,7 @@ public class UrbanGridProcessTest {
         return result;
     }
 
-    private static void calculatePerimeters(Geometry geom, boolean reference)
-            throws IOException {
+    private static void calculatePerimeters(Geometry geom, boolean reference) throws IOException {
 
         String path = null;
 
@@ -355,7 +651,7 @@ public class UrbanGridProcessTest {
         // Feature collection selection
         FeatureCollection coll = null;
         try {
-            //coll = source.getFeatures();
+            // coll = source.getFeatures();
             coll = source.getFeatures(filter);
         } catch (IOException e) {
             throw new ProcessException(e);
@@ -371,22 +667,22 @@ public class UrbanGridProcessTest {
         double totalPerimeter = 0;
 
         // Selection of the inner list
-        //List<Double> areas = new ArrayList<Double>();
+        // List<Double> areas = new ArrayList<Double>();
 
-        //double totalArea = 0;
+        // double totalArea = 0;
         // Cycle on each polygon
         try {
             while (iter.hasNext()) {
                 SimpleFeature feature = (SimpleFeature) iter.next();
-                Geometry sourceGeometry = (Geometry) feature.getDefaultGeometry();                
+                Geometry sourceGeometry = (Geometry) feature.getDefaultGeometry();
                 // If the geometry is a Polygon, then the operations are executed
                 // reprojection of the polygon
                 Geometry geoPrj = reprojectToEqualArea(sourceCRS, sourceGeometry);
-                if(geoPrj!=null){
-                 // Area/Perimeter calculation
-                    //double area = geoPrj.getArea();
-                    //areas.add(area);
-                    //totalArea += area;
+                if (geoPrj != null) {
+                    // Area/Perimeter calculation
+                    // double area = geoPrj.getArea();
+                    // areas.add(area);
+                    // totalArea += area;
                     totalPerimeter += geoPrj.getLength();
                 }
             }
@@ -400,12 +696,12 @@ public class UrbanGridProcessTest {
         ds.dispose();
 
         if (reference) {
-            //areasRef = areas;
-            //totalAreaRef = totalArea;
+            // areasRef = areas;
+            // totalAreaRef = totalArea;
             totalPerimeterRef = totalPerimeter;
         } else {
-            //areasCur = areas;
-            //totalAreaCur = totalArea;
+            // areasCur = areas;
+            // totalAreaCur = totalArea;
             totalPerimeterCur = totalPerimeter;
         }
     }
@@ -413,15 +709,16 @@ public class UrbanGridProcessTest {
     private static Geometry reprojectToEqualArea(CoordinateReferenceSystem sourceCRS,
             Geometry sourceGeometry) throws FactoryException, TransformException {
         // Reproject to the Lambert Equal Area
-        
-        final ReferencedEnvelope env = new ReferencedEnvelope(sourceGeometry.getEnvelopeInternal(), sourceCRS);
+
+        final ReferencedEnvelope env = new ReferencedEnvelope(sourceGeometry.getEnvelopeInternal(),
+                sourceCRS);
         // Geometry center used for centering the reprojection on the Geometry(reduces distance artifacts)
         double lat = env.getMedian(1);
         double lon = env.getMedian(0);
         // Geometry center used for centering the reprojection on the Geometry(reduces distance artifacts)
         Point center = sourceGeometry.getCentroid();
         // Creation of the MathTransform associated to the reprojection
-        MathTransform transPoint = CRS.findMathTransform(sourceCRS, CRS.decode("EPSG:4326"),true);
+        MathTransform transPoint = CRS.findMathTransform(sourceCRS, CRS.decode("EPSG:4326"), true);
         Point centerRP = (Point) JTS.transform(center, transPoint);
         lon = centerRP.getY();
         lat = centerRP.getX();
@@ -431,7 +728,7 @@ public class UrbanGridProcessTest {
         // Parsing of the selected WKT
         final CoordinateReferenceSystem targetCRS = CRS.parseWKT(wkt);
         // Creation of the MathTransform associated to the reprojection
-        MathTransform trans = CRS.findMathTransform(sourceCRS, targetCRS,true);
+        MathTransform trans = CRS.findMathTransform(sourceCRS, targetCRS, true);
         // Geometry reprojection
         Geometry geoPrj;
         if (!trans.isIdentity()) {
@@ -441,5 +738,4 @@ public class UrbanGridProcessTest {
         }
         return geoPrj;
     }
-
 }

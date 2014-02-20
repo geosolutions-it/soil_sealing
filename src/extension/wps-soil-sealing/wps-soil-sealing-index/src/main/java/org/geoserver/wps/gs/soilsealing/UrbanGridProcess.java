@@ -50,13 +50,13 @@ import org.opengis.feature.type.FeatureType;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory2;
 import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
 
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Point;
-import com.vividsolutions.jts.geom.Polygon;
 
 /**
  * This process calculates various indexes on the UrbanGrids. Indexes 5-6-7b-7c are calculated using Urban Grids as polygons. The other indexes are
@@ -73,6 +73,8 @@ import com.vividsolutions.jts.geom.Polygon;
  * 
  */
 public class UrbanGridProcess implements GSProcess {
+    private static final CoordinateReferenceSystem WGS84;
+
     /** Logger used for logging exceptions */
     public static final Logger LOGGER = Logger.getLogger(UrbanGridProcess.class.toString());
 
@@ -117,6 +119,19 @@ public class UrbanGridProcess implements GSProcess {
     /** Default Pixel Area */
     private static final double PIXEL_AREA = 400;
 
+    static {
+        CoordinateReferenceSystem crs = null;
+        try {
+            crs = CRS.decode("EPSG:4326");
+        } catch (NoSuchAuthorityCodeException e) {
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
+        } catch (FactoryException e) {
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
+        }
+
+        WGS84 = crs;
+    }
+
     /** Countdown latch used for handling various threads simultaneously */
     private CountDownLatch latch;
 
@@ -144,8 +159,7 @@ public class UrbanGridProcess implements GSProcess {
             @DescribeParameter(name = "pixelarea", min = 0, description = "Pixel Area") Double pixelArea,
             @DescribeParameter(name = "rois", min = 1, description = "Administrative Areas") List<Geometry> rois,
             @DescribeParameter(name = "populations", min = 0, description = "Populations for each Area") List<List<Integer>> populations,
-            @DescribeParameter(name = "coefficient", min = 0, description = "Multiplier coefficient for index 10") Double coeff)
-            throws Exception {
+            @DescribeParameter(name = "coefficient", min = 0, description = "Multiplier coefficient for index 10") Double coeff) {
 
         // Check on the index 7
         boolean nullSubId = subId == null || subId.isEmpty();
@@ -189,6 +203,7 @@ public class UrbanGridProcess implements GSProcess {
                 return new CLCProcess().execute(referenceCoverage, nowCoverage, classes,
                         CLCProcess.FIRST_INDEX, areaPx, rois, null, null, true);
             }
+            break;
         case EIGHTH_INDEX:
             // Raster elaboration
             return prepareImages(referenceCoverage, nowCoverage, rois, areaPx * HACONVERTER);
@@ -212,13 +227,18 @@ public class UrbanGridProcess implements GSProcess {
 
         double[] statsRef = null;
         double[] statsNow = null;
-        // For each coverage are calculated the results
-        if (referenceCoverage != null && pathToRefShp != null && !pathToRefShp.isEmpty()) {
-            statsRef = prepareResults(pathToRefShp, index, rois, subIndexB, numThreads, area);
-        }
+        try {
+            // For each coverage are calculated the results
+            if (referenceCoverage != null && pathToRefShp != null && !pathToRefShp.isEmpty()) {
+                statsRef = prepareResults(pathToRefShp, index, rois, subIndexB, numThreads, area);
+            }
 
-        if (nowCoverage != null && pathToCurShp != null && !pathToCurShp.isEmpty()) {
-            statsNow = prepareResults(pathToCurShp, index, rois, subIndexB, numThreads, area);
+            if (nowCoverage != null && pathToCurShp != null && !pathToCurShp.isEmpty()) {
+                statsNow = prepareResults(pathToCurShp, index, rois, subIndexB, numThreads, area);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, e.getMessage(), e);
+            throw new ProcessException(e);
         }
         // Result accumulation
         List<StatisticContainer> results = accumulateResults(rois, statsRef, statsNow);
@@ -325,21 +345,21 @@ public class UrbanGridProcess implements GSProcess {
         // Counter used for cycling on the Geometries
         int counter = 0;
         // Cycle on the urbanGrid results
-        for (ListContainer container : urbanGrids) {           
-            
-            if(area){
-             // List of all the areas
+        for (ListContainer container : urbanGrids) {
+
+            if (area) {
+                // List of all the areas
                 List<Double> areas = container.getSortedList();
-             // Total polygon number except the biggest
+                // Total polygon number except the biggest
                 int numPolyNotMax = areas.size() - 1;
-             // Area of the maximum polygon
+                // Area of the maximum polygon
                 double polyMaxArea = areas.get(numPolyNotMax);
                 // Calculation of the total urban area
                 double sut = container.getTotalArea();
                 // Calculation of the urban area without the maximum polygon area
                 double sud = sut - polyMaxArea;
-                
-             // Calculation of the indexes
+
+                // Calculation of the indexes
                 switch (index) {
                 case FIFTH_INDEX:
                     stats[counter] = sud / sut;
@@ -351,16 +371,17 @@ public class UrbanGridProcess implements GSProcess {
                     } else {
                         stats[counter] = (sud / numPolyNotMax) * HACONVERTER;
                     }
-                }                
-            }else{
+                }
+            } else {
                 // Selection of the Geometry
                 Geometry geo = rois.get(counter);
                 // Selection of the Geometry CRS
                 CoordinateReferenceSystem sourceCRS = CRS.decode("EPSG:" + geo.getSRID());
                 // Geometry reprojection
                 Geometry geoPrj = reprojectToEqualArea(sourceCRS, geo);
-                if(geoPrj==null){
-                    throw new ProcessException("Unable to reproject the input Administrative Geometry");
+                if (geoPrj == null) {
+                    throw new ProcessException(
+                            "Unable to reproject the input Administrative Geometry");
                 }
                 // Geometry Area
                 double areaAdmin = geoPrj.getArea();
@@ -393,6 +414,9 @@ public class UrbanGridProcess implements GSProcess {
         latch = new CountDownLatch(numThreads);
         // ShapeFile selection
         File file = new File(inputShp);
+        if (!file.exists()) {
+            throw new ProcessException("Input Shapefile not found");
+        }
         Map map = new HashMap();
         map.put("url", file.toURL());
         // Datastore creation
@@ -440,11 +464,11 @@ public class UrbanGridProcess implements GSProcess {
         // Geometry center used for centering the reprojection on the Geometry(reduces distance artifacts)
         Point center = sourceGeometry.getCentroid();
         // Creation of the MathTransform associated to the reprojection
-        MathTransform transPoint = CRS.findMathTransform(sourceCRS, CRS.decode("EPSG:4326"),true);
+        MathTransform transPoint = CRS.findMathTransform(sourceCRS, WGS84, true);
         Point centerRP = (Point) JTS.transform(center, transPoint);
         // Creation of a wkt for the selected Geometry
-        String wkt = PROJ_4326.replace("%LAT0%", String.valueOf(centerRP.getX()));
-        wkt = wkt.replace("%LON0%", String.valueOf(centerRP.getY()));
+        String wkt = PROJ_4326.replace("%LAT0%", String.valueOf(centerRP.getY()));
+        wkt = wkt.replace("%LON0%", String.valueOf(centerRP.getX()));
         // Parsing of the selected WKT
         final CoordinateReferenceSystem targetCRS = CRS.parseWKT(wkt);
         // Creation of the MathTransform associated to the reprojection
@@ -475,7 +499,7 @@ public class UrbanGridProcess implements GSProcess {
         boolean refExists = referenceCoverage != null;
         boolean nowExists = nowCoverage != null;
         // Selections of the Hints to use
-        RenderingHints hints = GeoTools.getDefaultHints();
+        RenderingHints hints = GeoTools.getDefaultHints().clone();
 
         RenderedImage inputImage = null;
         // Merging of the 2 images if they are both present or selection of the single image
@@ -592,7 +616,7 @@ public class UrbanGridProcess implements GSProcess {
             FeatureCollection coll = null;
             try {
                 coll = source.getFeatures(filter);
-                //coll = source.getFeatures();
+                // coll = source.getFeatures();
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, e.getMessage());
                 throw new ProcessException(e);
@@ -619,7 +643,7 @@ public class UrbanGridProcess implements GSProcess {
                     // reprojection of the polygon
                     Geometry geoPrj = reprojectToEqualArea(sourceCRS, sourceGeometry);
                     // Area/Perimeter calculation
-                    if(geoPrj!=null){
+                    if (geoPrj != null) {
                         if (area) {
                             double area = geoPrj.getArea();
                             areas.add(area);
