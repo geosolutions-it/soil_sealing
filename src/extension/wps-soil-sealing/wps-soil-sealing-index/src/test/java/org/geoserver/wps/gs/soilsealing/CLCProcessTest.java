@@ -301,6 +301,8 @@ public class CLCProcessTest {
         Assert.assertEquals(idx, clctest5, DELTA);
     }
 
+    // EXCEPTION TESTS
+
     @Test(expected = IllegalArgumentException.class)
     public void testNoCoverages() {
         List<StatisticContainer> result = new CLCProcess().execute(null, null, classes, 1, AREA,
