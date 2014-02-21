@@ -13,14 +13,11 @@ import it.geosolutions.jaiext.buffer.BufferRIF;
 import java.awt.RenderingHints;
 import java.awt.image.DataBuffer;
 import java.awt.image.RenderedImage;
-import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -35,17 +32,20 @@ import javax.media.jai.ROI;
 import javax.media.jai.RenderedOp;
 import javax.media.jai.operator.BandSelectDescriptor;
 
+import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.data.DataStore;
-import org.geotools.data.DataStoreFinder;
+import org.geotools.data.DefaultTransaction;
+import org.geotools.data.FeatureReader;
 import org.geotools.data.FeatureSource;
+import org.geotools.data.Query;
+import org.geotools.data.Transaction;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.GeoTools;
-import org.geotools.feature.FeatureCollection;
-import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.image.jai.Registry;
+import org.geotools.jdbc.JDBCDataStore;
 import org.geotools.process.ProcessException;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeResult;
@@ -53,6 +53,7 @@ import org.geotools.process.gs.GSProcess;
 import org.geotools.referencing.CRS;
 import org.jaitools.imageutils.ROIGeometry;
 import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory2;
@@ -148,15 +149,19 @@ public class UrbanGridProcess implements GSProcess {
     /** Countdown latch used for handling various threads simultaneously */
     private CountDownLatch latch;
 
+    /** Imperviousness Vectorial Layer */
+    private FeatureTypeInfo imperviousnessReference;
+
     /** Path associated to the shapefile of the reference image */
-    private String pathToRefShp;
+    private String referenceYear;
 
     /** Path associated to the shapefile of the current image */
-    private String pathToCurShp;
-
-    public UrbanGridProcess(String pathToRefShp, String pathToCurShp) {
-        this.pathToRefShp = pathToRefShp;
-        this.pathToCurShp = pathToCurShp;
+    private String currentYear;
+    
+    public UrbanGridProcess(FeatureTypeInfo imperviousnessReference, String referenceYear, String currentYear) {
+        this.imperviousnessReference = imperviousnessReference;
+        this.referenceYear = referenceYear;
+        this.currentYear = currentYear;
     }
 
     // HP to verify
@@ -242,12 +247,12 @@ public class UrbanGridProcess implements GSProcess {
         double[] statsNow = null;
         try {
             // For each coverage are calculated the results
-            if (referenceCoverage != null && pathToRefShp != null && !pathToRefShp.isEmpty()) {
-                statsRef = prepareResults(pathToRefShp, index, rois, subIndexB, numThreads, area);
+            if (referenceCoverage != null && referenceYear != null && imperviousnessReference != null) {
+                statsRef = prepareResults(referenceYear, imperviousnessReference, index, rois, subIndexB, numThreads, area);
             }
 
-            if (nowCoverage != null && pathToCurShp != null && !pathToCurShp.isEmpty()) {
-                statsNow = prepareResults(pathToCurShp, index, rois, subIndexB, numThreads, area);
+            if (nowCoverage != null && currentYear != null && imperviousnessReference != null) {
+                statsNow = prepareResults(currentYear, imperviousnessReference, index, rois, subIndexB, numThreads, area);
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, e.getMessage(), e);
@@ -335,7 +340,8 @@ public class UrbanGridProcess implements GSProcess {
     /**
      * Calculates the index for each Geometry and takes a ShapeFile path for Urban Grid Geometries.
      * 
-     * @param inputShp Path to the shapefile to use
+     * @param year Year of the shapefile to use
+     * @param imperviousnessReference Layer of the shapefile to use
      * @param index index to calculate
      * @param rois Input Administrative Areas
      * @param subIndexB Boolean indicating if the subIndex to calculate is "b"
@@ -348,11 +354,11 @@ public class UrbanGridProcess implements GSProcess {
      * @throws FactoryException
      * @throws TransformException
      */
-    private double[] prepareResults(String inputShp, int index, List<Geometry> rois,
+    private double[] prepareResults(String year, FeatureTypeInfo imperviousnessReference, int index, List<Geometry> rois,
             boolean subIndexB, int numThreads, boolean area) throws MalformedURLException,
             IOException, InterruptedException, FactoryException, TransformException {
         // Calculation on the Urban Grids
-        List<ListContainer> urbanGrids = calculateGeometries(inputShp, rois, numThreads, area);
+        List<ListContainer> urbanGrids = calculateGeometries(year, imperviousnessReference, rois, numThreads, area);
         // Results
         double[] stats = new double[rois.size()];
         // Counter used for cycling on the Geometries
@@ -411,7 +417,8 @@ public class UrbanGridProcess implements GSProcess {
     /**
      * Calculates the UrbanGrid area/perimeters for each Administrative area inside a separate thread.
      * 
-     * @param inputShp Input ShapeFile path
+     * @param year Input ShapeFile year
+     * @param imperviousnessReference Input ShapeFile layer
      * @param rois List of all the input Geometries
      * @param numThreads Number of threads to lauch
      * @param area Boolean indicating if area must be calculated. (Otherwise perimeter is calculated)
@@ -420,20 +427,13 @@ public class UrbanGridProcess implements GSProcess {
      * @throws IOException
      * @throws InterruptedException
      */
-    private List<ListContainer> calculateGeometries(String inputShp, List<Geometry> rois,
+    private List<ListContainer> calculateGeometries(String year, FeatureTypeInfo imperviousnessReference, List<Geometry> rois,
             int numThreads, boolean area) throws MalformedURLException, IOException,
             InterruptedException {
         // Initialization of the CountDown latch for handling multiple threads together
         latch = new CountDownLatch(numThreads);
-        // ShapeFile selection
-        File file = new File(inputShp);
-        if (!file.exists()) {
-            throw new ProcessException("Input Shapefile not found");
-        }
-        Map map = new HashMap();
-        map.put("url", file.toURL());
         // Datastore creation
-        DataStore dataStore = DataStoreFinder.getDataStore(map);
+        final JDBCDataStore ds = (JDBCDataStore) imperviousnessReference.getStore().getDataStore(null);
         // ThreadPoolExecutor object used for launching multiple threads simultaneously
         ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads, numThreads, 60,
                 TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(1000000));
@@ -445,7 +445,7 @@ public class UrbanGridProcess implements GSProcess {
             ListContainer container = new ListContainer();
             allLists.add(container);
             // Creation of a new Runnable for the UrbanGrids computation
-            MyRunnable run = new MyRunnable(geo, dataStore, container, area);
+            MyRunnable run = new MyRunnable(geo, ds, container, area);
             executor.execute(run);
         }
         // Waiting until all the threads have finished
@@ -456,7 +456,7 @@ public class UrbanGridProcess implements GSProcess {
         executor.awaitTermination(30, TimeUnit.SECONDS);
 
         // Datastore disposal
-        dataStore.dispose();
+//        ds.dispose();
 
         return allLists;
     }
@@ -625,21 +625,20 @@ public class UrbanGridProcess implements GSProcess {
             FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
 
             Filter filter = ff.within(ff.property(geometryPropertyName), ff.literal(geo));
+            Query query = new Query(typeName, filter);
             // Feature collection selection
-            FeatureCollection coll = null;
+            FeatureReader<SimpleFeatureType, SimpleFeature> ftReader = null;
+            Transaction transaction = new DefaultTransaction();
             try {
-                coll = source.getFeatures(filter);
-                // coll = source.getFeatures();
+                ftReader = ds.getFeatureReader(query, transaction);
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, e.getMessage());
                 throw new ProcessException(e);
             }
 
-            if (coll == null) {
+            if (ftReader == null) {
                 throw new ProcessException("Source Feature collection not found");
             }
-            // Iterator on the features
-            FeatureIterator iter = coll.features();
 
             double totalPerimeter = 0;
 
@@ -649,8 +648,8 @@ public class UrbanGridProcess implements GSProcess {
             double totalArea = 0;
             // Cycle on each polygon
             try {
-                while (iter.hasNext()) {
-                    SimpleFeature feature = (SimpleFeature) iter.next();
+                while (ftReader.hasNext()) {
+                    SimpleFeature feature = (SimpleFeature) ftReader.next();
                     Geometry sourceGeometry = (Geometry) feature.getDefaultGeometry();
                     // If the geometry is a Polygon, then the operations are executed
                     // reprojection of the polygon
@@ -672,8 +671,17 @@ public class UrbanGridProcess implements GSProcess {
                 LOGGER.log(Level.SEVERE, e.getMessage());
                 throw new ProcessException(e);
             } finally {
-                // Iterator closure
-                iter.close();
+                try {
+                    // Iterator closure
+                    if (ftReader != null) {
+                        ftReader.close();
+                    }
+                    
+                    transaction.commit();
+                    transaction.close();
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, e.getMessage());
+                }
             }
             // Saving results
             if (area) {
