@@ -4,13 +4,11 @@
  */
 package org.geoserver.wps.gs.soilsealing;
 
-import java.awt.geom.AffineTransform;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -30,7 +28,6 @@ import org.geoserver.wps.gs.soilsealing.model.SoilSealingIndex;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingOutput;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingTime;
 import org.geotools.coverage.grid.GridCoverage2D;
-import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.filter.IsEqualsToImpl;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
@@ -41,7 +38,6 @@ import org.geotools.resources.image.ImageUtilities;
 import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridCoverageReader;
 import org.opengis.filter.Filter;
-import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
@@ -95,7 +91,6 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             @DescribeParameter(name = "nowFilter", description = "Filter to use on the raster data", min = 0) Filter nowFilter,
             @DescribeParameter(name = "index", min = 1, description = "Index to calculate") int index,
             @DescribeParameter(name = "subindex", min = 0, description = "String indicating which sub-index must be calculated {a,b,c}") String subIndex,
-            @DescribeParameter(name = "classes", collectionType = Integer.class, min = 0, description = "The domain of the classes used in input rasters") Set<Integer> classes,
             @DescribeParameter(name = "geocoderLayer", min = 1, description = "Name of the geocoder layer, optionally fully qualified (workspace:name)") String geocoderLayer,
             @DescribeParameter(name = "geocoderPopulationLayer", min = 1, description = "Name of the geocoder population layer, optionally fully qualified (workspace:name)") String geocoderPopulationLayer,
             @DescribeParameter(name = "imperviousnessLayer", min = 1, description = "Name of the imperviousness layer, optionally fully qualified (workspace:name)") String imperviousnessLayer,
@@ -154,20 +149,26 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             final String referenceYear = ((IsEqualsToImpl) referenceFilter).getExpression2().toString().substring(0, 4);
             final String currentYear = (nowFilter == null ? null : ((IsEqualsToImpl) nowFilter).getExpression2().toString().substring(0, 4));
             
-            // extract administrative units and geometries
-            // //
-            // GRID TO WORLD preparation from reference
-            // //
-            final AffineTransform gridToWorldCorner = (AffineTransform) ((GridGeometry2D) ciReference.getGrid()).getGridToCRS2D(PixelOrientation.UPPER_LEFT);
-            final CoordinateReferenceSystem referenceCrs = ciReference.getCRS();
-            
             // //////////////////////////////////////
             // Scan the geocoding layers and prepare
             // the geometries and population values.
             // //////////////////////////////////////
+            boolean toRasterSpace = false;
+            
+            switch (index) {
+            case 7:
+                if (!subIndex.equals("a")) break;
+            case 8:
+            case 9:
+            case 10:
+                toRasterSpace = true;
+            }
+            
+            final CoordinateReferenceSystem referenceCrs = ciReference.getCRS();
             prepareAdminROIs(nowFilter, admUnits, admUnitSelectionType, ciReference,
                     geoCodingReference, populationReference, municipalities, rois, populations,
-                    referenceYear, currentYear);
+                    referenceYear, currentYear,
+                    referenceCrs, toRasterSpace);
             
             // read reference coverage
             GridCoverageReader referenceReader = ciReference.getGridCoverageReader(null, null);
@@ -248,19 +249,17 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             refValues = cleanUpValues(refValues);
             curValues = cleanUpValues(curValues);
             
-            String[] clcLevels = new String[classes.size()];
-            i = 0;
-            for (Integer clcLevel : classes) {
-                clcLevels[i++] = String.valueOf(clcLevel);
-            }
+            String[] clcLevels = null;
             
             SoilSealingOutput soilSealingRefTimeOutput = new SoilSealingOutput(referenceName, (String[]) municipalities.toArray(new String[1]), clcLevels, refValues);
             SoilSealingTime soilSealingRefTime = new SoilSealingTime(((IsEqualsToImpl) referenceFilter).getExpression2().toString(), soilSealingRefTimeOutput);
             soilSealingIndexResult.setRefTime(soilSealingRefTime);
 
-            SoilSealingOutput soilSealingCurTimeOutput = new SoilSealingOutput(referenceName, (String[]) municipalities.toArray(new String[1]), clcLevels, curValues);
-            SoilSealingTime soilSealingCurTime = new SoilSealingTime(((IsEqualsToImpl) nowFilter).getExpression2().toString(), soilSealingCurTimeOutput);
-            soilSealingIndexResult.setCurTime(soilSealingCurTime);
+            if (nowFilter != null) {
+                SoilSealingOutput soilSealingCurTimeOutput = new SoilSealingOutput(referenceName, (String[]) municipalities.toArray(new String[1]), clcLevels, curValues);
+                SoilSealingTime soilSealingCurTime = new SoilSealingTime(((IsEqualsToImpl) nowFilter).getExpression2().toString(), soilSealingCurTimeOutput);
+                soilSealingIndexResult.setCurTime(soilSealingCurTime);
+            }
             
             return soilSealingIndexResult;
         } catch (Exception e) {

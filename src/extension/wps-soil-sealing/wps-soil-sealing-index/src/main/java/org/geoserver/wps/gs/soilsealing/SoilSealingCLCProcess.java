@@ -41,6 +41,7 @@ import org.opengis.coverage.grid.GridCoverageReader;
 import org.opengis.filter.Filter;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import com.vividsolutions.jts.geom.Geometry;
 
@@ -149,9 +150,11 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             // Scan the geocoding layers and prepare
             // the geometries and population values.
             // //////////////////////////////////////
+            final CoordinateReferenceSystem referenceCrs = ciReference.getCRS();
             prepareAdminROIs(nowFilter, admUnits, admUnitSelectionType, ciReference,
                     geoCodingReference, populationReference, municipalities, rois, populations,
-                    referenceYear, currentYear);
+                    referenceYear, currentYear,
+                    referenceCrs, true);
             
             // read reference coverage
             GridCoverageReader referenceReader = ciReference.getGridCoverageReader(null, null);

@@ -14,9 +14,6 @@ import java.util.TreeSet;
 
 import javax.media.jai.TiledImage;
 
-import org.geoserver.wps.gs.soilsealing.CLCProcess;
-import org.geoserver.wps.gs.soilsealing.UrbanGridProcess;
-import org.geoserver.wps.gs.soilsealing.CLCProcess.IndexColor;
 import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
