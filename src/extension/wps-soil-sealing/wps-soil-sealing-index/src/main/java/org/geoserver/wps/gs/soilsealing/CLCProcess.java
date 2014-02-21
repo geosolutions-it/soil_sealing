@@ -4,10 +4,12 @@
  */
 package org.geoserver.wps.gs.soilsealing;
 
+import it.geosolutions.jaiext.bandmerge.BandMergeCRIF;
 import it.geosolutions.jaiext.bandmerge.BandMergeDescriptor;
 import it.geosolutions.jaiext.stats.Statistics;
 import it.geosolutions.jaiext.stats.Statistics.StatsType;
 import it.geosolutions.jaiext.zonal.ZonalStatsDescriptor;
+import it.geosolutions.jaiext.zonal.ZonalStatsRIF;
 import it.geosolutions.jaiext.zonal.ZoneGeometry;
 
 import java.awt.image.RenderedImage;
@@ -15,11 +17,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import javax.media.jai.JAI;
 import javax.media.jai.ROI;
 import javax.media.jai.RenderedOp;
 
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.factory.GeoTools;
+import org.geotools.image.jai.Registry;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.process.gs.GSProcess;
@@ -64,6 +68,19 @@ public class CLCProcess implements GSProcess {
 
     /** Lower Bound used for index 4 */
     public static final double LOWER_BOUND_INDEX_4 = 0.5d;
+
+    public static final String JAI_EXT_PRODUCT = "it.geosolutions.jaiext.roiaware";
+    static {
+        try {
+            Registry.registerRIF(JAI.getDefaultInstance(), new BandMergeDescriptor(),
+                    new BandMergeCRIF(), JAI_EXT_PRODUCT);
+            Registry.registerRIF(JAI.getDefaultInstance(), new ZonalStatsDescriptor(),
+                    new ZonalStatsRIF(), JAI_EXT_PRODUCT);
+
+        } catch (Throwable e) {
+            // swallow exception in case the op has already been registered.
+        }
+    }
 
     /**
      * 
@@ -118,7 +135,6 @@ public class CLCProcess implements GSProcess {
         // Control on the population number for the 3° and 4° indexes
         int numAreas = rois.size();
 
-
         // PixelArea value
         double area = 0;
         if (pixelArea == null) {
@@ -143,10 +159,10 @@ public class CLCProcess implements GSProcess {
         case THIRD_INDEX:
         case FOURTH_INDEX:
             int numPop = 0;
-            if(populations!=null){
+            if (populations != null) {
                 numPop = populations.size();
-            }        
-            if (populations==null || numPop < 2 ) {
+            }
+            if (populations == null || numPop < 2) {
                 throw new IllegalArgumentException("Some Populations are not present");
             }
             int numPopRef = populations.get(ZERO_IDX).size();
