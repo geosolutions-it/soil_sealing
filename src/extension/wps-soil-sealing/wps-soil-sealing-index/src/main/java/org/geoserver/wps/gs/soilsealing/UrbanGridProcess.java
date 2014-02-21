@@ -8,6 +8,7 @@ import it.geosolutions.jaiext.algebra.AlgebraDescriptor;
 import it.geosolutions.jaiext.algebra.AlgebraDescriptor.Operator;
 import it.geosolutions.jaiext.bandmerge.BandMergeDescriptor;
 import it.geosolutions.jaiext.buffer.BufferDescriptor;
+import it.geosolutions.jaiext.buffer.BufferRIF;
 
 import java.awt.RenderingHints;
 import java.awt.image.DataBuffer;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.media.jai.JAI;
 import javax.media.jai.ROI;
 import javax.media.jai.RenderedOp;
 import javax.media.jai.operator.BandSelectDescriptor;
@@ -43,6 +45,7 @@ import org.geotools.factory.GeoTools;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.JTS;
+import org.geotools.image.jai.Registry;
 import org.geotools.process.ProcessException;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeResult;
@@ -123,7 +126,13 @@ public class UrbanGridProcess implements GSProcess {
     /** Default Pixel Area */
     private static final double PIXEL_AREA = 400;
 
+    public static final String JAI_EXT_PRODUCT = "it.geosolutions.jaiext.roiaware";
     static {
+        try {
+            Registry.registerRIF(JAI.getDefaultInstance(), new BufferDescriptor(), new BufferRIF(), JAI_EXT_PRODUCT);
+        } catch (Throwable e) {
+            // swallow exception in case the op has already been registered.
+        }
         CoordinateReferenceSystem crs = null;
         try {
             crs = CRS.decode("EPSG:4326");

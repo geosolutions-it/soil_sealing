@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 import javax.media.jai.RenderedOp;
 
@@ -45,6 +46,7 @@ import org.geotools.referencing.CRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.geotools.referencing.operation.transform.ProjectiveTransform;
 import org.geotools.resources.image.ImageUtilities;
+import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridCoverageReader;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
@@ -72,6 +74,8 @@ import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
 @DescribeProcess(title = "SoilSealingCLC", description = " Middleware process collecting the inputs for CLCProcess indexes")
 public class SoilSealingCLCProcess implements GSProcess {
 
+    private final static Logger LOGGER = Logging.getLogger(SoilSealingCLCProcess.class);
+            
     /**
      * Geometry and Filter Factories
      */
@@ -312,6 +316,15 @@ public class SoilSealingCLCProcess implements GSProcess {
             // Calling CLCProcess
             // ///////////////////////////////////////////////////////////////
             final CLCProcess clcProcess = new CLCProcess();
+            
+            LOGGER.info("Invocking the CLCProcess with the following parameters: ");
+            LOGGER.info(" --> referenceCoverage: " + referenceCoverage);
+            LOGGER.info(" --> nowCoverage: " + nowCoverage);
+            LOGGER.info(" --> classes: " + classes);
+            LOGGER.info(" --> index: " + index);
+            LOGGER.info(" --> rois(" + rois.size() + ")");
+            LOGGER.info(" --> populations(" + populations.size() + ")");
+            
             List<StatisticContainer> indexValue = clcProcess.execute(referenceCoverage, nowCoverage, classes, index, null, rois, populations, null, true);
             
             SoilSealingDTO soilSealingIndexResult = new SoilSealingDTO();
