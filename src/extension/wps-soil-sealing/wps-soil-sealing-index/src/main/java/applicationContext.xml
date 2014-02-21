@@ -11,11 +11,8 @@
 		<constructor-arg index="1" ref="geoServer" />
 	</bean>
 	
-	<bean id="clcProcess" class="org.geoserver.wps.gs.soilsealing.CLCProcess" />
-
-	<bean id="urbanGridProcess" class="org.geoserver.wps.gs.soilsealing.UrbanGridProcess">		
-		<constructor-arg index="0" value="shapefileReferencePath" />
-		<constructor-arg index="1" value="shapefileCurrentPath" />
+	<bean id="soilSealingImperviousness" class="org.geoserver.wps.gs.soilsealing.SoilSealingImperviousnessProcess">
+		<constructor-arg index="0" ref="catalog" />
+		<constructor-arg index="1" ref="geoServer" />
 	</bean>
-			
 </beans>

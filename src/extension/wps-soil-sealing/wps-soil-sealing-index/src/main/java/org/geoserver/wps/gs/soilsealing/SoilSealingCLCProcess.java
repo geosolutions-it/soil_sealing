@@ -4,11 +4,8 @@
  */
 package org.geoserver.wps.gs.soilsealing;
 
-import java.awt.geom.AffineTransform;
-import java.awt.geom.NoninvertibleTransformException;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -32,38 +29,20 @@ import org.geoserver.wps.gs.soilsealing.model.SoilSealingIndex;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingOutput;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingTime;
 import org.geotools.coverage.grid.GridCoverage2D;
-import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.data.simple.SimpleFeatureCollection;
-import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.filter.IsEqualsToImpl;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
-import org.geotools.geometry.jts.JTS;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
-import org.geotools.process.gs.GSProcess;
-import org.geotools.referencing.CRS;
-import org.geotools.referencing.operation.transform.AffineTransform2D;
-import org.geotools.referencing.operation.transform.ProjectiveTransform;
 import org.geotools.resources.image.ImageUtilities;
 import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridCoverageReader;
 import org.opengis.filter.Filter;
-import org.opengis.filter.FilterFactory;
-import org.opengis.geometry.MismatchedDimensionException;
-import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.NoSuchAuthorityCodeException;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.TransformException;
 
 import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.GeometryFactory;
-import com.vividsolutions.jts.geom.PrecisionModel;
-import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
 
 /**
  * Middleware process collecting the inputs for {@link CLCProcess} indexes.
@@ -72,26 +51,10 @@ import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
  * 
  */
 @DescribeProcess(title = "SoilSealingCLC", description = " Middleware process collecting the inputs for CLCProcess indexes")
-public class SoilSealingCLCProcess implements GSProcess {
+public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
 
     private final static Logger LOGGER = Logging.getLogger(SoilSealingCLCProcess.class);
             
-    /**
-     * Geometry and Filter Factories
-     */
-    private static final FilterFactory ff = CommonFactoryFinder.getFilterFactory(null);
-    private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel());
-
-    /**
-     * The GeoServer Catalog
-     */
-    private Catalog catalog;
-
-    /**
-     * The GeoServer Bean
-     */
-    private GeoServer geoserver;
-
     /**
      * Default Constructor
      * 
@@ -99,8 +62,7 @@ public class SoilSealingCLCProcess implements GSProcess {
      * @param geoserver
      */
     public SoilSealingCLCProcess(Catalog catalog, GeoServer geoserver) {
-        this.catalog = catalog;
-        this.geoserver = geoserver;
+        super(catalog, geoserver);
     }
 
     /**
@@ -147,7 +109,7 @@ public class SoilSealingCLCProcess implements GSProcess {
         FeatureTypeInfo geoCodingReference = catalog.getFeatureTypeByName(geocoderLayer);
         FeatureTypeInfo populationReference = catalog.getFeatureTypeByName(geocoderPopulationLayer);
         if (geoCodingReference == null || populationReference == null) {
-            throw new WPSException("Could not find geocodind reference layers (" + geocoderLayer
+            throw new WPSException("Could not find geocoding reference layers (" + geocoderLayer
                     + " / " + geocoderPopulationLayer + ")");
         }
 
@@ -161,6 +123,11 @@ public class SoilSealingCLCProcess implements GSProcess {
         RenderedOp result = null;
         GridCoverage2D nowCoverage = null;
         GridCoverage2D referenceCoverage = null;
+        List<String> municipalities = new LinkedList<String>();
+        List<Geometry> rois = new LinkedList<Geometry>();
+        List<List<Integer>> populations = new LinkedList<List<Integer>>();
+        populations.add(new LinkedList<Integer>());
+        if (nowFilter != null) populations.add(new LinkedList<Integer>());
         // ///////////////////////////////////////////////
 
         // ///////////////////////////////////////////////
@@ -177,89 +144,14 @@ public class SoilSealingCLCProcess implements GSProcess {
 
             final String referenceYear = ((IsEqualsToImpl) referenceFilter).getExpression2().toString().substring(0, 4);
             final String currentYear = (nowFilter == null ? null : ((IsEqualsToImpl) nowFilter).getExpression2().toString().substring(0, 4));
-            
-            // extract administrative units and geometries
-            // //
-            // GRID TO WORLD preparation from reference
-            // //
-            final AffineTransform gridToWorldCorner = (AffineTransform) ((GridGeometry2D) ciReference.getGrid()).getGridToCRS2D(PixelOrientation.UPPER_LEFT);
-            final CoordinateReferenceSystem referenceCrs = ciReference.getCRS();
-            
-            List<String> municipalities = new LinkedList<String>();
-            List<Geometry> rois = new LinkedList<Geometry>();
-            List<List<Integer>> populations = new LinkedList<List<Integer>>();
-            populations.add(new LinkedList<Integer>());
-            if (nowFilter != null) populations.add(new LinkedList<Integer>());
-            
-            for (String au : admUnits.split(",")) {
-                SoilSealingAdministrativeUnit sAu = new SoilSealingAdministrativeUnit(au, geoCodingReference, populationReference);
-                if (admUnitSelectionType == AuSelectionType.AU_LIST) {
-                    Geometry roi = null;
-                    int referencePopulation = 0;
-                    int currentPopulation = 0;
-                    switch (sAu.getType()) {
-                    case MUNICIPALITY :
-                        populateInputLists(nowFilter, referenceYear, currentYear,
-                                gridToWorldCorner, referenceCrs, rois, populations, sAu);
-                        municipalities.add(sAu.getName() + " - " + sAu.getParent());
-                        break;
-                    case DISTRICT:
-                        for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
-                        {
-                            if (roi == null) roi = toRasterSpace(ssAu.getTheGeom(), referenceCrs, gridToWorldCorner);
-                            else roi = GEOMETRY_FACTORY.buildGeometry(Arrays.asList(roi, toRasterSpace(ssAu.getTheGeom(), referenceCrs, gridToWorldCorner))).union();
-                            referencePopulation += ssAu.getPopulation().get(referenceYear);
-                            if (nowFilter != null) currentPopulation += ssAu.getPopulation().get(currentYear);
-                        }
-                        rois.add(roi);
-                        populations.get(0).add(referencePopulation);
-                        if (nowFilter != null) populations.get(1).add(currentPopulation);
-                        municipalities.add(sAu.getName() + " - " + sAu.getParent());
-                        break;
-                    case REGION:
-                        for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
-                        {
-                            for(SoilSealingAdministrativeUnit sssAu : ssAu.getSubs()) {
-                                if (roi == null) roi = toRasterSpace(sssAu.getTheGeom(), referenceCrs, gridToWorldCorner);
-                                else roi = GEOMETRY_FACTORY.buildGeometry(Arrays.asList(roi, toRasterSpace(sssAu.getTheGeom(), referenceCrs, gridToWorldCorner))).union();
-                                referencePopulation += sssAu.getPopulation().get(referenceYear);
-                                if (nowFilter != null) currentPopulation += sssAu.getPopulation().get(currentYear);
-                            }
-                        }
-                        rois.add(roi);
-                        populations.get(0).add(referencePopulation);
-                        if (nowFilter != null) populations.get(1).add(currentPopulation);
-                        municipalities.add(sAu.getName() + " - " + sAu.getParent());
-                        break;
-                    }
-                } else if (admUnitSelectionType == AuSelectionType.AU_SUBS) {
-                    switch (sAu.getType()) {
-                    case MUNICIPALITY :
-                        populateInputLists(nowFilter, referenceYear, currentYear,
-                                gridToWorldCorner, referenceCrs, rois, populations, sAu);
-                        municipalities.add(sAu.getName() + " - " + sAu.getParent());
-                        break;
-                    case DISTRICT:
-                        for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
-                        {
-                            populateInputLists(nowFilter, referenceYear, currentYear,
-                                    gridToWorldCorner, referenceCrs, rois, populations, ssAu);
-                            municipalities.add(ssAu.getName() + " - " + ssAu.getParent());
-                        }
-                        break;
-                    case REGION:
-                        for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
-                        {
-                            for(SoilSealingAdministrativeUnit sssAu : ssAu.getSubs()) {
-                                populateInputLists(nowFilter, referenceYear, currentYear,
-                                        gridToWorldCorner, referenceCrs, rois, populations, sssAu);
-                                municipalities.add(sssAu.getName() + " - " + sssAu.getParent());
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
+
+            // //////////////////////////////////////
+            // Scan the geocoding layers and prepare
+            // the geometries and population values.
+            // //////////////////////////////////////
+            prepareAdminROIs(nowFilter, admUnits, admUnitSelectionType, ciReference,
+                    geoCodingReference, populationReference, municipalities, rois, populations,
+                    referenceYear, currentYear);
             
             // read reference coverage
             GridCoverageReader referenceReader = ciReference.getGridCoverageReader(null, null);
@@ -317,16 +209,19 @@ public class SoilSealingCLCProcess implements GSProcess {
             // ///////////////////////////////////////////////////////////////
             final CLCProcess clcProcess = new CLCProcess();
             
-            LOGGER.info("Invocking the CLCProcess with the following parameters: ");
-            LOGGER.info(" --> referenceCoverage: " + referenceCoverage);
-            LOGGER.info(" --> nowCoverage: " + nowCoverage);
-            LOGGER.info(" --> classes: " + classes);
-            LOGGER.info(" --> index: " + index);
-            LOGGER.info(" --> rois(" + rois.size() + ")");
-            LOGGER.info(" --> populations(" + populations.size() + ")");
+            LOGGER.finer("Invocking the CLCProcess with the following parameters: ");
+            LOGGER.finer(" --> referenceCoverage: " + referenceCoverage);
+            LOGGER.finer(" --> nowCoverage: " + nowCoverage);
+            LOGGER.finer(" --> classes: " + classes);
+            LOGGER.finer(" --> index: " + index);
+            LOGGER.finer(" --> rois(" + rois.size() + ")");
+            LOGGER.finer(" --> populations(" + populations.size() + ")");
             
             List<StatisticContainer> indexValue = clcProcess.execute(referenceCoverage, nowCoverage, classes, index, null, rois, populations, null, true);
             
+            // ///////////////////////////////////////////////////////////////
+            // Preparing the Output Object which will be JSON encoded
+            // ///////////////////////////////////////////////////////////////
             SoilSealingDTO soilSealingIndexResult = new SoilSealingDTO();
             
             SoilSealingIndex soilSealingIndex = new SoilSealingIndex(index, "");
@@ -355,10 +250,12 @@ public class SoilSealingCLCProcess implements GSProcess {
             SoilSealingTime soilSealingRefTime = new SoilSealingTime(((IsEqualsToImpl) referenceFilter).getExpression2().toString(), soilSealingRefTimeOutput);
             soilSealingIndexResult.setRefTime(soilSealingRefTime);
 
-            SoilSealingOutput soilSealingCurTimeOutput = new SoilSealingOutput(referenceName, (String[]) municipalities.toArray(new String[1]), clcLevels, curValues);
-            SoilSealingTime soilSealingCurTime = new SoilSealingTime(((IsEqualsToImpl) nowFilter).getExpression2().toString(), soilSealingCurTimeOutput);
-            soilSealingIndexResult.setCurTime(soilSealingCurTime);
-
+            if (nowFilter != null) {
+                SoilSealingOutput soilSealingCurTimeOutput = new SoilSealingOutput(referenceName, (String[]) municipalities.toArray(new String[1]), clcLevels, curValues);
+                SoilSealingTime soilSealingCurTime = new SoilSealingTime(((IsEqualsToImpl) nowFilter).getExpression2().toString(), soilSealingCurTimeOutput);
+                soilSealingIndexResult.setCurTime(soilSealingCurTime);
+            }
+            
             return soilSealingIndexResult;
         } catch (Exception e) {
 
@@ -401,68 +298,6 @@ public class SoilSealingCLCProcess implements GSProcess {
             if (nowCoverage != null) {
                 nowCoverage.dispose(true);
             }
-        }
-    }
-
-    static private double[][] cleanUpValues(double[][] values) {
-        if (values != null) {
-            int i = 0;
-            for (double[] d : values) {
-                if (d != null) {
-                    int j = 0;
-                    for (double v : d) {
-                        v = Double.isNaN(v) || Double.isInfinite(v) ? 0 : v;
-                        values[i][j++] = v;
-                    }
-                }
-                i++;
-            }
-        }
-        
-        return values;
-    }
-
-    /**
-     * @param nowFilter
-     * @param referenceYear
-     * @param currentYear
-     * @param gridToWorldCorner
-     * @param referenceCrs
-     * @param rois
-     * @param populations
-     * @param sAu
-     * @throws NoSuchAuthorityCodeException
-     * @throws FactoryException
-     * @throws TransformException
-     * @throws NoninvertibleTransformException
-     */
-    private void populateInputLists(Filter nowFilter, final String referenceYear,
-            final String currentYear, final AffineTransform gridToWorldCorner,
-            final CoordinateReferenceSystem referenceCrs, List<Geometry> rois,
-            List<List<Integer>> populations, SoilSealingAdministrativeUnit sAu)
-            throws NoSuchAuthorityCodeException, FactoryException, TransformException,
-            NoninvertibleTransformException {
-        rois.add(toRasterSpace(sAu.getTheGeom(), referenceCrs, gridToWorldCorner));
-        populations.get(0).add(sAu.getPopulation().get(referenceYear));
-        if (nowFilter != null) populations.get(1).add(sAu.getPopulation().get(currentYear));
-    }
-
-    private Geometry toRasterSpace(Geometry theGeom, CoordinateReferenceSystem referenceCrs, AffineTransform gridToWorldCorner) throws NoSuchAuthorityCodeException, FactoryException, MismatchedDimensionException, TransformException, NoninvertibleTransformException {
-        // check if we need to reproject the ROI from WGS84 (standard in the input) to the reference CRS
-        final CoordinateReferenceSystem targetCrs = CRS.decode("EPSG:"+theGeom.getSRID(), true);
-        if (CRS.equalsIgnoreMetadata(referenceCrs, targetCrs)) {
-            Geometry rasterSpaceGeometry = JTS.transform(theGeom, new AffineTransform2D(gridToWorldCorner.createInverse()));
-            return DouglasPeuckerSimplifier.simplify(rasterSpaceGeometry, 1);
-        } else {
-            // reproject
-            MathTransform transform = CRS.findMathTransform(targetCrs, referenceCrs, true);
-            Geometry roiPrj;
-            if (transform.isIdentity()) {
-                roiPrj = theGeom;
-            } else {
-                roiPrj = JTS.transform(theGeom, transform);
-            }
-            return JTS.transform(roiPrj, ProjectiveTransform.create(gridToWorldCorner).inverse());
         }
     }
 
