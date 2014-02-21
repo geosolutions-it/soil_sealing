@@ -15,12 +15,17 @@ import java.util.List;
 import java.util.Map;
 
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geotools.data.DefaultTransaction;
+import org.geotools.data.FeatureStore;
 import org.geotools.data.Query;
+import org.geotools.data.Transaction;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.opengis.feature.Feature;
 import org.opengis.feature.Property;
+import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
@@ -81,20 +86,21 @@ public class SoilSealingAdministrativeUnit {
         this.parent = au.split("_")[1];
 
         FeatureIterator<? extends Feature> iterator = null;
+        Transaction transaction = new DefaultTransaction();
         try {
+            final FeatureStore<SimpleFeatureType, SimpleFeature> ftSrc = (FeatureStore<SimpleFeatureType, SimpleFeature>) geoCodingReference.getFeatureSource(null, null);
+            ftSrc.setTransaction(transaction);
             Filter nameFilter = ff.equals(ff.property("name"), ff.literal(this.name));
             Filter parentFilter = ff.equals(ff.property("parent"), ff.literal(this.parent));
             Filter queryFilter = ff.and(Arrays.asList(nameFilter, parentFilter));
-            Query query = new Query(geoCodingReference.getFeatureType().getName().getLocalPart(),
-                    queryFilter);
-            int count = geoCodingReference.getFeatureSource(null, null).getCount(query);
+            Query query = new Query(geoCodingReference.getFeatureType().getName().getLocalPart(), queryFilter);
+            int count = ftSrc.getCount(query);
 
             if (count == 0) {
                 throw new IOException("Invalid Administrative Unit name: no record found!");
             }
 
-            FeatureCollection<? extends FeatureType, ? extends Feature> features = geoCodingReference
-                    .getFeatureSource(null, null).getFeatures(queryFilter);
+            FeatureCollection<? extends FeatureType, ? extends Feature> features = ftSrc.getFeatures(queryFilter);
 
             if (features == null || features.features() == null) {
                 throw new IOException("Invalid Administrative Unit name: no record found!");
@@ -111,6 +117,9 @@ public class SoilSealingAdministrativeUnit {
             if (iterator != null) {
                 iterator.close();
             }
+
+            transaction.commit();
+            transaction.close();
         }
 
         if (this.type == null || this.the_geom == null) {
@@ -135,24 +144,23 @@ public class SoilSealingAdministrativeUnit {
      * @param soilSealingAdministrativeUnit
      * @throws IOException
      */
-    private void loadSubs(SoilSealingAdministrativeUnit soilSealingAdministrativeUnit)
-            throws IOException {
+    private void loadSubs(SoilSealingAdministrativeUnit soilSealingAdministrativeUnit) throws IOException {
         FeatureIterator<? extends Feature> iterator = null;
+        Transaction transaction = new DefaultTransaction();
         try {
+            final FeatureStore<SimpleFeatureType, SimpleFeature> ftSrc = (FeatureStore<SimpleFeatureType, SimpleFeature>) geoCodingReference.getFeatureSource(null, null);
+            ftSrc.setTransaction(transaction);
             Filter parentFilter = ff.equals(ff.property("parent"), ff.literal(this.name));
-            Filter typeFilter = ff
-                    .equals(ff.property("type"), ff.literal(this.type.getValue() + 1));
+            Filter typeFilter = ff.equals(ff.property("type"), ff.literal(this.type.getValue() + 1));
             Filter queryFilter = ff.and(Arrays.asList(typeFilter, parentFilter));
-            Query query = new Query(geoCodingReference.getFeatureType().getName().getLocalPart(),
-                    queryFilter);
-            int count = geoCodingReference.getFeatureSource(null, null).getCount(query);
+            Query query = new Query(geoCodingReference.getFeatureType().getName().getLocalPart(), queryFilter);
+            int count = ftSrc.getCount(query);
 
             if (count == 0) {
                 throw new IOException("Invalid Administrative Unit name: no record found!");
             }
 
-            FeatureCollection<? extends FeatureType, ? extends Feature> features = geoCodingReference
-                    .getFeatureSource(null, null).getFeatures(queryFilter);
+            FeatureCollection<? extends FeatureType, ? extends Feature> features = ftSrc.getFeatures(queryFilter);
 
             if (features == null || features.features() == null) {
                 throw new IOException("Invalid Administrative Unit name: no record found!");
@@ -173,6 +181,9 @@ public class SoilSealingAdministrativeUnit {
         } finally {
             if (iterator != null) {
                 iterator.close();
+
+                transaction.commit();
+                transaction.close();
             }
         }
     }
@@ -182,23 +193,22 @@ public class SoilSealingAdministrativeUnit {
      * @param soilSealingAdministrativeUnit
      * @throws IOException
      */
-    private void loadPopulationStatistics(
-            SoilSealingAdministrativeUnit soilSealingAdministrativeUnit) throws IOException {
+    private void loadPopulationStatistics(SoilSealingAdministrativeUnit soilSealingAdministrativeUnit) throws IOException {
         FeatureIterator<? extends Feature> iterator = null;
+        Transaction transaction = new DefaultTransaction();
         try {
+            final FeatureStore<SimpleFeatureType, SimpleFeature> ftSrc = (FeatureStore<SimpleFeatureType, SimpleFeature>) populationReference.getFeatureSource(null, null);
+            ftSrc.setTransaction(transaction);
             Filter auNameFilter = ff.equals(ff.property("au_name"), ff.literal(this.name));
             Filter queryFilter = ff.and(Arrays.asList(auNameFilter));
-            Query query = new Query(populationReference.getFeatureType().getName().getLocalPart(),
-                    queryFilter);
-            int count = populationReference.getFeatureSource(null, null).getCount(query);
+            Query query = new Query(populationReference.getFeatureType().getName().getLocalPart(), queryFilter);
+            int count = ftSrc.getCount(query);
 
             if (count > 0) {
-                FeatureCollection<? extends FeatureType, ? extends Feature> features = populationReference
-                        .getFeatureSource(null, null).getFeatures(queryFilter);
+                FeatureCollection<? extends FeatureType, ? extends Feature> features = ftSrc.getFeatures(queryFilter);
 
                 if (features == null || features.features() == null) {
-                    throw new IOException(
-                            "Invalid Administrative Unit name: no population record found!");
+                    throw new IOException("Invalid Administrative Unit name: no population record found!");
                 }
 
                 iterator = features.features();
@@ -209,8 +219,7 @@ public class SoilSealingAdministrativeUnit {
                         if (prop.getName().getLocalPart().startsWith("a_")) {
                             Object yearPopulationValue = prop.getValue();
                             if (yearPopulationValue != null) {
-                                population.put(prop.getName().getLocalPart().split("a_")[1],
-                                        ((BigDecimal) yearPopulationValue).intValue());
+                                population.put(prop.getName().getLocalPart().split("a_")[1], ((BigDecimal) yearPopulationValue).intValue());
                             }
                         }
                     }
@@ -219,6 +228,9 @@ public class SoilSealingAdministrativeUnit {
         } finally {
             if (iterator != null) {
                 iterator.close();
+
+                transaction.commit();
+                transaction.close();
             }
         }
     }

@@ -217,8 +217,7 @@ public class FeaturesImporter {
 
         // start a transaction and fill the target with the input features
         Transaction t = new DefaultTransaction();
-        SimpleFeatureStore fstore = (SimpleFeatureStore) ds.getFeatureSource(targetType
-                .getTypeName());
+        SimpleFeatureStore fstore = (SimpleFeatureStore) ds.getFeatureSource(targetType.getTypeName());
         fstore.setTransaction(t);
         SimpleFeatureIterator fi = features.features();
         SimpleFeatureBuilder fb = new SimpleFeatureBuilder(targetType);

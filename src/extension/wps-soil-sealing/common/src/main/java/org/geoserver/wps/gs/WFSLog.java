@@ -171,8 +171,7 @@ public class WFSLog implements GSProcess {
                 cb.setStore(storeInfo);
 
                 // build the typeInfo and set CRS if necessary
-                FeatureTypeInfo typeInfo = cb
-                        .buildFeatureType(targetFeatures.getSchema().getName());
+                FeatureTypeInfo typeInfo = cb.buildFeatureType(targetFeatures.getSchema().getName());
                 if (targetSRSCode != null) {
                     typeInfo.setSRS(targetSRSCode);
                 }
