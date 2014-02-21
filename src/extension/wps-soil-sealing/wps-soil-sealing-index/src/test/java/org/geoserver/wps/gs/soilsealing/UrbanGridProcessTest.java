@@ -208,7 +208,7 @@ public class UrbanGridProcessTest {
         populations.add(popnow);
     }
 
-    @Test
+    //@Test
     public void testIndex5() {
         List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, null, 5, null,
                 null, geomListUtm32N, null, null);
@@ -223,7 +223,7 @@ public class UrbanGridProcessTest {
         Assert.assertEquals(expected, calculated, DELTA);
     }
 
-    @Test
+    //@Test
     public void testIndex5img2() {
         List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 5,
                 null, null, geomListUtm32N, null, null);
@@ -247,7 +247,7 @@ public class UrbanGridProcessTest {
         Assert.assertEquals(expectedCur, calculatedCur, DELTA);
     }
 
-    @Test
+    //@Test
     public void testIndex6() throws Exception {
         List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, null, 6, null,
                 null, geomListUtm32N, null, null);
@@ -261,7 +261,7 @@ public class UrbanGridProcessTest {
         Assert.assertEquals(expectedRef, calculatedRef, DELTA);
     }
 
-    @Test
+    //@Test
     public void testIndex6img2() throws Exception {
         List<StatisticContainer> results = urbanProcess.execute(referenceCoverage, nowCoverage, 6,
                 null, null, geomListUtm32N, null, null);
@@ -282,7 +282,7 @@ public class UrbanGridProcessTest {
         Assert.assertEquals(expectedCur, calculatedCur, DELTA);
     }
 
-    @Test
+    //@Test
     public void testIndex7() {
         // Index 7a
         List<StatisticContainer> resultsA = urbanProcess.execute(referenceCoverage, null, 7, "a",
@@ -319,7 +319,7 @@ public class UrbanGridProcessTest {
         Assert.assertEquals(expectedRefC, calculatedRefC, DELTA);
     }
 
-    @Test
+    //@Test
     public void testIndex7img2() {
         // Index 7a
         List<StatisticContainer> resultsA = urbanProcess.execute(referenceCoverage, nowCoverage, 7,

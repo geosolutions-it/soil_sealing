@@ -16,6 +16,7 @@ import java.awt.image.RenderedImage;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -157,6 +158,10 @@ public class UrbanGridProcess implements GSProcess {
 
     /** Path associated to the shapefile of the current image */
     private String currentYear;
+
+    private String pathToRefShp;
+
+    private String pathToCurShp;
     
     public UrbanGridProcess(FeatureTypeInfo imperviousnessReference, String referenceYear, String currentYear) {
         this.imperviousnessReference = imperviousnessReference;
@@ -164,6 +169,11 @@ public class UrbanGridProcess implements GSProcess {
         this.currentYear = currentYear;
     }
 
+    public UrbanGridProcess(String pathToRefShp, String pathToCurShp) {
+        this.pathToRefShp = pathToRefShp;
+        this.pathToCurShp = pathToCurShp;
+    }
+    
     // HP to verify
     // HP1 = admin geometries in Raster space, for index 7a-8-9-10; in SHP CRS for the other indexes
     // HP2 = Coverages already cropped and transformed to the Raster Space
@@ -369,27 +379,31 @@ public class UrbanGridProcess implements GSProcess {
             if (area) {
                 // List of all the areas
                 List<Double> areas = container.getSortedList();
-                // Total polygon number except the biggest
-                int numPolyNotMax = areas.size() - 1;
-                // Area of the maximum polygon
-                double polyMaxArea = areas.get(numPolyNotMax);
-                // Calculation of the total urban area
-                double sut = container.getTotalArea();
-                // Calculation of the urban area without the maximum polygon area
-                double sud = sut - polyMaxArea;
+                if (areas != null && areas.size() > 0) {
+                    // Total polygon number except the biggest
+                    int numPolyNotMax = areas.size() - 1;
+                    // Area of the maximum polygon
+                    double polyMaxArea = areas.get(numPolyNotMax);
+                    // Calculation of the total urban area
+                    double sut = container.getTotalArea();
+                    // Calculation of the urban area without the maximum polygon area
+                    double sud = sut - polyMaxArea;
 
-                // Calculation of the indexes
-                switch (index) {
-                case FIFTH_INDEX:
-                    stats[counter] = sud / sut;
-                    break;
-                case SEVENTH_INDEX:
-                    // Check on the subIndex selected
-                    if (subIndexB) {
-                        stats[counter] = (polyMaxArea / sut) * 100;
-                    } else {
-                        stats[counter] = (sud / numPolyNotMax) * HACONVERTER;
+                    // Calculation of the indexes
+                    switch (index) {
+                    case FIFTH_INDEX:
+                        stats[counter] = (sud / sut) * 100.0;
+                        break;
+                    case SEVENTH_INDEX:
+                        // Check on the subIndex selected
+                        if (subIndexB) {
+                            stats[counter] = (polyMaxArea / sut) * 100.0;
+                        } else {
+                            stats[counter] = (sud / numPolyNotMax) * HACONVERTER;
+                        }
                     }
+                } else {
+                    stats[counter] = 0;
                 }
             } else {
                 // Selection of the Geometry
@@ -445,7 +459,7 @@ public class UrbanGridProcess implements GSProcess {
             ListContainer container = new ListContainer();
             allLists.add(container);
             // Creation of a new Runnable for the UrbanGrids computation
-            MyRunnable run = new MyRunnable(geo, ds, container, area);
+            MyRunnable run = new MyRunnable(year, geo, imperviousnessReference, ds, container, area);
             executor.execute(run);
         }
         // Waiting until all the threads have finished
@@ -578,7 +592,11 @@ public class UrbanGridProcess implements GSProcess {
      */
     class MyRunnable implements Runnable {
 
+        private String year;
+        
         private Geometry geo;
+
+        private FeatureTypeInfo imperviousnessReference;
 
         private DataStore ds;
 
@@ -586,8 +604,10 @@ public class UrbanGridProcess implements GSProcess {
 
         private final boolean area;
 
-        public MyRunnable(Geometry geo, DataStore ds, ListContainer values, boolean area) {
+        public MyRunnable(String year, Geometry geo, FeatureTypeInfo imperviousnessReference, DataStore ds, ListContainer values, boolean area) {
+            this.year = year;
             this.geo = geo;
+            this.imperviousnessReference = imperviousnessReference;
             this.ds = ds;
             this.values = values;
             this.area = area;
@@ -599,7 +619,7 @@ public class UrbanGridProcess implements GSProcess {
             String typeName = null;
             FeatureSource source = null;
             try {
-                typeName = ds.getTypeNames()[0];
+                typeName = imperviousnessReference.getFeatureType().getName().getLocalPart();
                 source = ds.getFeatureSource(typeName);
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, e.getMessage());
@@ -619,13 +639,14 @@ public class UrbanGridProcess implements GSProcess {
             }
 
             // ShapeFile CRS
-            CoordinateReferenceSystem sourceCRS = schema.getGeometryDescriptor()
-                    .getCoordinateReferenceSystem();
+            CoordinateReferenceSystem sourceCRS = schema.getGeometryDescriptor().getCoordinateReferenceSystem();
             // Filter on the data store by selecting only the geometries contained into the input Geometry
             FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
 
-            Filter filter = ff.within(ff.property(geometryPropertyName), ff.literal(geo));
-            Query query = new Query(typeName, filter);
+            Filter yearFilter = ff.equals(ff.property("imp_year"), ff.literal(this.year));
+            Filter geometryFilter = ff.within(ff.property(geometryPropertyName), ff.literal(geo));
+            Filter queryFilter = ff.and(Arrays.asList(yearFilter, geometryFilter));
+            Query query = new Query(typeName, queryFilter);
             // Feature collection selection
             FeatureReader<SimpleFeatureType, SimpleFeature> ftReader = null;
             Transaction transaction = new DefaultTransaction();
