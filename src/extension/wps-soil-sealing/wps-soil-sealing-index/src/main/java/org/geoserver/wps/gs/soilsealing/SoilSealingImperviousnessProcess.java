@@ -53,6 +53,7 @@ import com.vividsolutions.jts.geom.Geometry;
 @DescribeProcess(title = "SoilSealingImperviousness", description = "Middleware process collecting the inputs for UrbanGridProcess indexes")
 public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProcess {
 
+    private static final double INDEX_10_VALUE = 6.0;
     private final static Logger LOGGER = Logging.getLogger(SoilSealingImperviousnessProcess.class);
             
     /**
@@ -226,7 +227,7 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             // ///////////////////////////////////////////////////////////////
             final UrbanGridProcess urbanGridProcess = new UrbanGridProcess(imperviousnessReference, referenceYear, currentYear);
             
-            List<StatisticContainer> indexValue = urbanGridProcess.execute(referenceCoverage, nowCoverage, index, subIndex, null, rois, populations, (index == 10 ? 1.0 : null));
+            List<StatisticContainer> indexValue = urbanGridProcess.execute(referenceCoverage, nowCoverage, index, subIndex, null, rois, populations, (index == 10 ? INDEX_10_VALUE : null));
             
             // ///////////////////////////////////////////////////////////////
             // Preparing the Output Object which will be JSON encoded
