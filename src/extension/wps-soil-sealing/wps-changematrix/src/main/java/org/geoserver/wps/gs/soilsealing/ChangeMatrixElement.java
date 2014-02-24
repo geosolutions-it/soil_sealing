@@ -25,14 +25,14 @@ public class ChangeMatrixElement implements Comparable<ChangeMatrixElement> {
     /**
      * The number of pixel that has been changed from class ref to class now
      */
-    private long pixels;
+    private double pixels;
 
     /**
      * @param ref
      * @param now
      * @param pixels
      */
-    public ChangeMatrixElement(int ref, int now, long pixels) {
+    public ChangeMatrixElement(int ref, int now, double pixels) {
         this.ref = ref;
         this.now = now;
         this.pixels = pixels;
@@ -55,7 +55,7 @@ public class ChangeMatrixElement implements Comparable<ChangeMatrixElement> {
     /**
      * @return the pixels
      */
-    public long getPixels() {
+    public double getPixels() {
         return pixels;
     }
 

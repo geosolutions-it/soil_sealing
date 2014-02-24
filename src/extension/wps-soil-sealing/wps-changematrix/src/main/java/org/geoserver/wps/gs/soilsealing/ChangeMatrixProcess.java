@@ -109,6 +109,10 @@ public class ChangeMatrixProcess implements GSProcess {
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(
             new PrecisionModel());
 
+    private static final double HACONVERTER = 0.0001;
+    
+    private static final double PIXEL_AREA = 10000;
+
     private Catalog catalog;
 
     private GeoServer geoserver;
@@ -407,11 +411,13 @@ public class ChangeMatrixProcess implements GSProcess {
             final String rasterName = ciReference.getName() + "_cm_" + System.nanoTime();
             final GridCoverage2D retValue = new GridCoverageFactory(hints).create(rasterName,
                     result, referenceCoverage.getEnvelope());
-
+            
             /**
              * creating the ChangeMatrix grid
              */
-            final ChangeMatrixDTO changeMatrix = new ChangeMatrixDTO(cm, classes, rasterName);
+            // Value used for converting the counted pixels into areas (UOM=ha)
+            double multiplier = HACONVERTER*PIXEL_AREA;
+            final ChangeMatrixDTO changeMatrix = new ChangeMatrixDTO(cm, classes, rasterName,multiplier);
 
             /**
              * Add Overviews...
