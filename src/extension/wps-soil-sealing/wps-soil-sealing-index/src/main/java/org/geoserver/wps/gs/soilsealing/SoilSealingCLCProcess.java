@@ -10,8 +10,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import javax.media.jai.RenderedOp;
 
@@ -32,6 +34,7 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.filter.IsEqualsToImpl;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
+import org.geotools.process.ProcessException;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
@@ -91,7 +94,7 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             @DescribeParameter(name = "referenceFilter", description = "Filter to use on the raster data", min = 1) Filter referenceFilter,
             @DescribeParameter(name = "nowFilter", description = "Filter to use on the raster data", min = 0) Filter nowFilter,
             @DescribeParameter(name = "index", min = 1, description = "Index to calculate") int index,
-            @DescribeParameter(name = "classes", collectionType = Integer.class, min = 1, description = "The domain of the classes used in input rasters") Set<Integer> classes,
+            @DescribeParameter(name = "classes", collectionType = Integer.class, min = 0, description = "The domain of the classes used in input rasters") Set<Integer> classes,
             @DescribeParameter(name = "geocoderLayer", description = "Name of the geocoder layer, optionally fully qualified (workspace:name)") String geocoderLayer,
             @DescribeParameter(name = "geocoderPopulationLayer", description = "Name of the geocoder population layer, optionally fully qualified (workspace:name)") String geocoderPopulationLayer,
             @DescribeParameter(name = "admUnits", min = 1, description = "Comma Separated list of Administrative Units") String admUnits,
@@ -204,6 +207,44 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
 
                 if (nowCoverage == null) {
                     throw new WPSException("Input Current Coverage not found");
+                }
+            }
+            
+            // ///////////////////////////////////////////////////////////////
+            // Preparing classes for index 3-4
+            // ///////////////////////////////////////////////////////////////
+            if (index == 3 || index == 4) {
+                classes = new TreeSet<Integer>();
+
+                // Selection of the CLC level
+                int indexValue = referenceName.indexOf("_L");
+
+                String substring = referenceName.substring(indexValue + 2, indexValue + 3);
+
+                int clcLevel = Integer.parseInt(substring);
+
+                switch (clcLevel) {
+                case 1:
+                    classes.add(4);
+                    break;
+                case 2:
+                    classes.add(10);
+                    classes.add(11);
+                    classes.add(14);
+                    break;
+                case 3:
+                    classes.add(1);
+                    classes.add(7);
+                    classes.add(8);
+                    classes.add(10);
+                    classes.add(19);
+                    classes.add(22);
+                    classes.add(31);
+                    classes.add(39);
+                    classes.add(40);
+                    break;
+                default:
+                    throw new ProcessException("Wrong clc level");
                 }
             }
             

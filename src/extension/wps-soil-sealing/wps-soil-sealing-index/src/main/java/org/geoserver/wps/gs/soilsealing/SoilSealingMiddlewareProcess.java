@@ -102,6 +102,7 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
             SoilSealingAdministrativeUnit sAu = new SoilSealingAdministrativeUnit(au, geoCodingReference, populationReference);
             if (admUnitSelectionType == AuSelectionType.AU_LIST) {
                 Geometry roi = null;
+                int srID=0;
                 int referencePopulation = 0;
                 int currentPopulation = 0;
                 switch (sAu.getType()) {
@@ -113,13 +114,17 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                 case DISTRICT:
                     for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
                     {
-                        if (roi == null) roi = toReferenceCRS(ssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace);
+                        if (roi == null) {
+                                roi = toReferenceCRS(ssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace);
+                                srID = roi.getSRID();
+                            }
                         else roi = GEOMETRY_FACTORY.buildGeometry(Arrays.asList(roi, toReferenceCRS(ssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace))).union();
                         if (ssAu.getPopulation() != null) {
                             if (ssAu.getPopulation().get(referenceYear) != null) referencePopulation += ssAu.getPopulation().get(referenceYear);
                             if (nowFilter != null && ssAu.getPopulation().get(currentYear) != null) currentPopulation += ssAu.getPopulation().get(currentYear);
                         }
                     }
+                    roi.setSRID(srID);
                     rois.add(roi);
                     populations.get(0).add(referencePopulation);
                     if (nowFilter != null) populations.get(1).add(currentPopulation);
@@ -129,7 +134,10 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                     for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
                     {
                         for(SoilSealingAdministrativeUnit sssAu : ssAu.getSubs()) {
-                            if (roi == null) roi = toReferenceCRS(sssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace);
+                            if (roi == null){
+                                roi = toReferenceCRS(sssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace);
+                                srID = roi.getSRID();
+                            }
                             else roi = GEOMETRY_FACTORY.buildGeometry(Arrays.asList(roi, toReferenceCRS(sssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace))).union();
                             if (sssAu.getPopulation() != null) {
                                 if (sssAu.getPopulation().get(referenceYear) != null) referencePopulation += sssAu.getPopulation().get(referenceYear);
@@ -137,6 +145,7 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                             }
                         }
                     }
+                    roi.setSRID(srID);
                     rois.add(roi);
                     populations.get(0).add(referencePopulation);
                     if (nowFilter != null) populations.get(1).add(currentPopulation);

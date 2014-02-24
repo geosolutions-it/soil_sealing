@@ -30,16 +30,33 @@ public class ChangeMatrixDTO {
      * @param classes
      * @param cm
      */
-    public ChangeMatrixDTO(ChangeMatrix cm, Set<Integer> classes, String rasterName) {
+    public ChangeMatrixDTO(ChangeMatrix cm, Set<Integer> classes, String rasterName, Double multiplier) {
+        
+        double value = 1;
+        
+        if(multiplier!=null){
+            value = multiplier;
+        }
+        
         this.setRasterName(rasterName);
 
         for (Integer elRef : classes) {
             for (Integer elNow : classes) {
                 final ChangeMatrixElement cme = new ChangeMatrixElement(elRef, elNow,
-                        cm.retrievePairOccurrences(elRef, elNow));
+                        cm.retrievePairOccurrences(elRef, elNow)*value);
                 add(cme);
             }
         }
+    }
+    
+    /**
+     * Init the changeMatrix as an empty TreeSet
+     * 
+     * @param classes
+     * @param cm
+     */
+    public ChangeMatrixDTO(ChangeMatrix cm, Set<Integer> classes, String rasterName) {
+        this(cm,classes,rasterName,null);
     }
 
     /**
