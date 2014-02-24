@@ -115,8 +115,10 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                     {
                         if (roi == null) roi = toReferenceCRS(ssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace);
                         else roi = GEOMETRY_FACTORY.buildGeometry(Arrays.asList(roi, toReferenceCRS(ssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace))).union();
-                        referencePopulation += ssAu.getPopulation().get(referenceYear);
-                        if (nowFilter != null) currentPopulation += ssAu.getPopulation().get(currentYear);
+                        if (ssAu.getPopulation() != null) {
+                            if (ssAu.getPopulation().get(referenceYear) != null) referencePopulation += ssAu.getPopulation().get(referenceYear);
+                            if (nowFilter != null && ssAu.getPopulation().get(currentYear) != null) currentPopulation += ssAu.getPopulation().get(currentYear);
+                        }
                     }
                     rois.add(roi);
                     populations.get(0).add(referencePopulation);
@@ -129,8 +131,10 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                         for(SoilSealingAdministrativeUnit sssAu : ssAu.getSubs()) {
                             if (roi == null) roi = toReferenceCRS(sssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace);
                             else roi = GEOMETRY_FACTORY.buildGeometry(Arrays.asList(roi, toReferenceCRS(sssAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace))).union();
-                            referencePopulation += sssAu.getPopulation().get(referenceYear);
-                            if (nowFilter != null) currentPopulation += sssAu.getPopulation().get(currentYear);
+                            if (sssAu.getPopulation() != null) {
+                                if (sssAu.getPopulation().get(referenceYear) != null) referencePopulation += sssAu.getPopulation().get(referenceYear);
+                                if (nowFilter != null && sssAu.getPopulation().get(currentYear) != null) currentPopulation += sssAu.getPopulation().get(currentYear);
+                            }
                         }
                     }
                     rois.add(roi);
@@ -142,15 +146,13 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
             } else if (admUnitSelectionType == AuSelectionType.AU_SUBS) {
                 switch (sAu.getType()) {
                 case MUNICIPALITY :
-                    populateInputLists(nowFilter, referenceYear, currentYear,
-                            gridToWorldCorner, referenceCrs, rois, populations, sAu, toRasterSpace);
+                    populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, sAu, toRasterSpace);
                     municipalities.add(sAu.getName() + " - " + sAu.getParent());
                     break;
                 case DISTRICT:
                     for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
                     {
-                        populateInputLists(nowFilter, referenceYear, currentYear,
-                                gridToWorldCorner, referenceCrs, rois, populations, ssAu, toRasterSpace);
+                        populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, ssAu, toRasterSpace);
                         municipalities.add(ssAu.getName() + " - " + ssAu.getParent());
                     }
                     break;
@@ -158,8 +160,7 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                     for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
                     {
                         for(SoilSealingAdministrativeUnit sssAu : ssAu.getSubs()) {
-                            populateInputLists(nowFilter, referenceYear, currentYear,
-                                    gridToWorldCorner, referenceCrs, rois, populations, sssAu, toRasterSpace);
+                            populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, sssAu, toRasterSpace);
                             municipalities.add(sssAu.getName() + " - " + sssAu.getParent());
                         }
                     }
@@ -215,8 +216,10 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
             throws NoSuchAuthorityCodeException, FactoryException, TransformException,
             NoninvertibleTransformException {
         rois.add(toReferenceCRS(sAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace));
-        populations.get(0).add(sAu.getPopulation().get(referenceYear));
-        if (nowFilter != null) populations.get(1).add(sAu.getPopulation().get(currentYear));
+        if (sAu.getPopulation() != null) {
+            if (sAu.getPopulation().get(referenceYear) != null) populations.get(0).add(sAu.getPopulation().get(referenceYear));
+            if (nowFilter != null && sAu.getPopulation().get(currentYear) != null) populations.get(1).add(sAu.getPopulation().get(currentYear));
+        }
     }
 
     /**
@@ -233,6 +236,7 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
      */
     protected Geometry toReferenceCRS(Geometry theGeom, CoordinateReferenceSystem referenceCrs, AffineTransform gridToWorldCorner, boolean toRasterSpace) throws NoSuchAuthorityCodeException, FactoryException, MismatchedDimensionException, TransformException, NoninvertibleTransformException {
         // check if we need to reproject the ROI from WGS84 (standard in the input) to the reference CRS
+        if (theGeom.getSRID() <= 0) theGeom.setSRID(CRS.lookupEpsgCode(referenceCrs, true));
         final CoordinateReferenceSystem targetCrs = CRS.decode("EPSG:"+theGeom.getSRID(), true);
         if (CRS.equalsIgnoreMetadata(referenceCrs, targetCrs)) {
             Geometry rasterSpaceGeometry = JTS.transform(theGeom, new AffineTransform2D(gridToWorldCorner.createInverse()));
@@ -243,8 +247,10 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
             Geometry roiPrj;
             if (transform.isIdentity()) {
                 roiPrj = theGeom;
+                roiPrj.setSRID(CRS.lookupEpsgCode(targetCrs, true));
             } else {
                 roiPrj = JTS.transform(theGeom, transform);
+                roiPrj.setSRID(CRS.lookupEpsgCode(referenceCrs, true));
             }
             return (toRasterSpace ? JTS.transform(roiPrj, ProjectiveTransform.create(gridToWorldCorner).inverse()) : roiPrj);
         }
