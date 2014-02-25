@@ -303,7 +303,7 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             attributes.add(new FeatureAttribute("referenceName", referenceName));
             attributes.add(new FeatureAttribute("defaultStyle", defaultStyle));
             attributes.add(new FeatureAttribute("referenceFilter", referenceFilter.toString()));
-            attributes.add(new FeatureAttribute("nowFilter", nowFilter.toString()));
+            attributes.add(new FeatureAttribute("nowFilter", (nowFilter != null ? nowFilter.toString() : "")));
             attributes.add(new FeatureAttribute("index", index));
             attributes.add(new FeatureAttribute("subindex", (subIndex != null ? subIndex : "")));
             attributes.add(new FeatureAttribute("classes", (classes != null ? Arrays.toString(classes.toArray(new Integer[1])) : "")));

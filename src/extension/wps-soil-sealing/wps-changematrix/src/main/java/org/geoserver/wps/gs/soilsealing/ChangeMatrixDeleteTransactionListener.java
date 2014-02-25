@@ -51,7 +51,7 @@ public class ChangeMatrixDeleteTransactionListener implements TransactionListene
         }
 
         // check the correct event type and the correct FeatureType Name
-        if (TransactionEventType.PRE_DELETE == event.getType()) {
+        if (typeName.equalsIgnoreCase("changematrix") && TransactionEventType.PRE_DELETE == event.getType()) {
             List features = new ArrayList();
             features.addAll(DataUtilities.list(event.getAffectedFeatures()));
             for (Object ft : features) {
