@@ -38,7 +38,7 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
     /**
      * Geometry and Filter Factories
      */
-    private static final FilterFactory ff = CommonFactoryFinder.getFilterFactory(null);
+    protected static final FilterFactory ff = CommonFactoryFinder.getFilterFactory(null);
     protected static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel());
     
     /**

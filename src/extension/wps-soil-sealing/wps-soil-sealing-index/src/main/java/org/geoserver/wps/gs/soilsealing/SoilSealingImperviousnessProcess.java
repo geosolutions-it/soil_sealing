@@ -6,6 +6,8 @@ package org.geoserver.wps.gs.soilsealing;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +15,8 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 import javax.media.jai.RenderedOp;
+
+import net.sf.json.JSONSerializer;
 
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CoverageInfo;
@@ -27,16 +31,23 @@ import org.geoserver.wps.gs.soilsealing.SoilSealingAdministrativeUnit.AuSelectio
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingIndex;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingOutput;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingTime;
+import org.geoserver.wps.ppio.FeatureAttribute;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.data.collection.ListFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.filter.IsEqualsToImpl;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
+import org.geotools.geometry.jts.JTS;
+import org.geotools.process.ProcessException;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.resources.image.ImageUtilities;
+import org.geotools.util.NullProgressListener;
 import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridCoverageReader;
+import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.filter.Filter;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
@@ -221,6 +232,48 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
                     throw new WPSException("Input Current Coverage not found");
                 }
             }
+
+            // //////////////////////////////////////////////////////////////////////
+            // Logging to WFS ...
+            // //////////////////////////////////////////////////////////////////////
+            /**
+             * Convert the spread attributes into a FeatureType
+             */
+            List<FeatureAttribute> attributes = new ArrayList<FeatureAttribute>();
+
+            attributes.add(new FeatureAttribute("ftUUID", uuid.toString()));
+            attributes.add(new FeatureAttribute("runBegin", new Date()));
+            attributes.add(new FeatureAttribute("runEnd", new Date()));
+            attributes.add(new FeatureAttribute("itemStatus", "RUNNING"));
+            attributes.add(new FeatureAttribute("itemStatusMessage", "Instrumented by Server"));
+            attributes.add(new FeatureAttribute("referenceName", referenceName));
+            attributes.add(new FeatureAttribute("defaultStyle", defaultStyle));
+            attributes.add(new FeatureAttribute("referenceFilter", referenceFilter.toString()));
+            attributes.add(new FeatureAttribute("nowFilter", nowFilter.toString()));
+            attributes.add(new FeatureAttribute("index", index));
+            attributes.add(new FeatureAttribute("subindex", (subIndex != null ? subIndex : "")));
+            attributes.add(new FeatureAttribute("classes", ""));
+            attributes.add(new FeatureAttribute("admUnits", admUnits));
+            attributes.add(new FeatureAttribute("admUnitSelectionType", admUnitSelectionType));
+            attributes.add(new FeatureAttribute("wsName", wsName));
+            attributes.add(new FeatureAttribute("soilIndex", ""));
+
+            features = toFeatureProcess.execute(JTS.toGeometry(ciReference.getNativeBoundingBox()), ciReference.getCRS(), typeName, attributes, null);
+
+            if (features == null || features.isEmpty()) {
+                throw new ProcessException("There was an error while converting attributes into FeatureType.");
+            }
+
+            /**
+             * LOG into the DB
+             */
+            filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
+            features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true, new NullProgressListener());
+
+            if (features == null || features.isEmpty()) {
+                throw new ProcessException(
+                        "There was an error while logging FeatureType into the storage.");
+            }
             
             // ///////////////////////////////////////////////////////////////
             // Calling UrbanGridProcess
@@ -261,37 +314,56 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
                 SoilSealingTime soilSealingCurTime = new SoilSealingTime(((IsEqualsToImpl) nowFilter).getExpression2().toString(), soilSealingCurTimeOutput);
                 soilSealingIndexResult.setCurTime(soilSealingCurTime);
             }
+
+            // //////////////////////////////////////////////////////////////////////
+            // Updating WFS ...
+            // //////////////////////////////////////////////////////////////////////
+            /**
+             * Update Feature Attributes and LOG into the DB
+             */
+            filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
+
+            SimpleFeature feature = SimpleFeatureBuilder.copy(features.subCollection(filter).toArray(new SimpleFeature[1])[0]);
+
+            // build the feature
+            feature.setAttribute("runEnd", new Date());
+            feature.setAttribute("itemStatus", "COMPLETED");
+            feature.setAttribute("itemStatusMessage", "Soil Sealing Process completed successfully");
+            feature.setAttribute("soilIndex", JSONSerializer.toJSON(soilSealingIndexResult).toString());
+
+            ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
+            output.add(feature);
+
+            features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
             
+            // //////////////////////////////////////////////////////////////////////
+            // Return the computed Soil Sealing Index ...
+            // //////////////////////////////////////////////////////////////////////
             return soilSealingIndexResult;
         } catch (Exception e) {
 
-            // if (features != null) {
-            // // //////////////////////////////////////////////////////////////////////
-            // // Updating WFS ...
-            // // //////////////////////////////////////////////////////////////////////
-            // /**
-            // * Update Feature Attributes and LOG into the DB
-            // */
-            // filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
-            //
-            // SimpleFeature feature = SimpleFeatureBuilder.copy(features.subCollection(filter)
-            // .toArray(new SimpleFeature[1])[0]);
-            //
-            // // build the feature
-            // feature.setAttribute("runEnd", new Date());
-            // feature.setAttribute("itemStatus", "FAILED");
-            // feature.setAttribute(
-            // "itemStatusMessage",
-            // "There was an error while while processing Input parameters: "
-            // + e.getMessage());
-            //
-            // ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
-            // output.add(feature);
-            //
-            // features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter,
-            // false, new NullProgressListener());
-            // }
+            if (features != null) {
+                // //////////////////////////////////////////////////////////////////////
+                // Updating WFS ...
+                // //////////////////////////////////////////////////////////////////////
+                /**
+                 * Update Feature Attributes and LOG into the DB
+                 */
+                filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
 
+                SimpleFeature feature = SimpleFeatureBuilder.copy(features.subCollection(filter).toArray(new SimpleFeature[1])[0]);
+
+                // build the feature
+                feature.setAttribute("runEnd", new Date());
+                feature.setAttribute("itemStatus", "FAILED");
+                feature.setAttribute("itemStatusMessage", "There was an error while while processing Input parameters: " + e.getMessage());
+
+                ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
+                output.add(feature);
+
+                features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
+            }
+            
             throw new WPSException("Could process request ", e);
         } finally {
             // clean up
