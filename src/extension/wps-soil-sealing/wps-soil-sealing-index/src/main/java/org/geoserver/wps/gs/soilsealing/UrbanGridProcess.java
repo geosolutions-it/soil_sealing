@@ -4,8 +4,10 @@
  */
 package org.geoserver.wps.gs.soilsealing;
 
+import it.geosolutions.jaiext.algebra.AlgebraCRIF;
 import it.geosolutions.jaiext.algebra.AlgebraDescriptor;
 import it.geosolutions.jaiext.algebra.AlgebraDescriptor.Operator;
+import it.geosolutions.jaiext.bandmerge.BandMergeCRIF;
 import it.geosolutions.jaiext.bandmerge.BandMergeDescriptor;
 import it.geosolutions.jaiext.buffer.BufferDescriptor;
 import it.geosolutions.jaiext.buffer.BufferRIF;
@@ -132,6 +134,8 @@ public class UrbanGridProcess implements GSProcess {
     static {
         try {
             Registry.registerRIF(JAI.getDefaultInstance(), new BufferDescriptor(), new BufferRIF(), JAI_EXT_PRODUCT);
+            Registry.registerRIF(JAI.getDefaultInstance(), new AlgebraDescriptor(), new AlgebraCRIF(), JAI_EXT_PRODUCT);
+            Registry.registerRIF(JAI.getDefaultInstance(), new BandMergeDescriptor(), new BandMergeCRIF(), JAI_EXT_PRODUCT);
         } catch (Throwable e) {
             // swallow exception in case the op has already been registered.
         }

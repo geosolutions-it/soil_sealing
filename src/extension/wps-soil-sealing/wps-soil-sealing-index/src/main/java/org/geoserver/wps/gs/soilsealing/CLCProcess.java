@@ -72,11 +72,8 @@ public class CLCProcess implements GSProcess {
     public static final String JAI_EXT_PRODUCT = "it.geosolutions.jaiext.roiaware";
     static {
         try {
-            Registry.registerRIF(JAI.getDefaultInstance(), new BandMergeDescriptor(),
-                    new BandMergeCRIF(), JAI_EXT_PRODUCT);
-            Registry.registerRIF(JAI.getDefaultInstance(), new ZonalStatsDescriptor(),
-                    new ZonalStatsRIF(), JAI_EXT_PRODUCT);
-
+            Registry.registerRIF(JAI.getDefaultInstance(), new BandMergeDescriptor(), new BandMergeCRIF(), JAI_EXT_PRODUCT);
+            Registry.registerRIF(JAI.getDefaultInstance(), new ZonalStatsDescriptor(), new ZonalStatsRIF(), JAI_EXT_PRODUCT);
         } catch (Throwable e) {
             // swallow exception in case the op has already been registered.
         }
