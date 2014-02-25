@@ -305,9 +305,9 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                 if (toRasterSpace) {
                     Geometry projected = JTS.transform(geo,
                             ProjectiveTransform.create(gridToWorldCorner));
-                    union.union(projected);
+                    union = union.union(projected);
                 } else {
-                    union.union(geo);
+                    union = union.union(geo);
                 }
             }
         }
