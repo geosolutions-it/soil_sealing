@@ -234,7 +234,7 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             // ///////////////////////////////////////////////////////////////
             SoilSealingDTO soilSealingIndexResult = new SoilSealingDTO();
             
-            SoilSealingIndex soilSealingIndex = new SoilSealingIndex(index, "");
+            SoilSealingIndex soilSealingIndex = new SoilSealingIndex(index, subIndex);
             soilSealingIndexResult.setIndex(soilSealingIndex);
             
             double[][] refValues = new double[indexValue.size()][];
