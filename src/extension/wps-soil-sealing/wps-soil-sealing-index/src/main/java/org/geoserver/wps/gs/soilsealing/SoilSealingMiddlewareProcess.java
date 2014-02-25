@@ -10,10 +10,13 @@ import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.config.GeoServer;
+import org.geoserver.wps.WPSException;
 import org.geoserver.wps.gs.soilsealing.SoilSealingAdministrativeUnit.AuSelectionType;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.factory.CommonFactoryFinder;
+import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
+import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.process.gs.GSProcess;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
@@ -25,6 +28,7 @@ import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.datum.PixelInCell;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
 
@@ -263,5 +267,90 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
             }
             return (toRasterSpace ? JTS.transform(roiPrj, ProjectiveTransform.create(gridToWorldCorner).inverse()) : roiPrj);
         }
+    }
+    
+    /**
+     * Utility method for creating the GridGeometry for reading only the active part of the image
+     * 
+     * @param ciReference
+     * @param rois
+     * @param toRasterSpace
+     * @param referenceCrs
+     * @param gridROI
+     * @return
+     * @throws TransformException
+     * @throws FactoryException
+     * @throws Exception
+     */
+    protected GridGeometry2D createGridROI(CoverageInfo ciReference, List<Geometry> rois,
+            boolean toRasterSpace, final CoordinateReferenceSystem referenceCrs) 
+                    throws TransformException, FactoryException, Exception {
+        // Creation of a Geometry union for cropping the input coverages
+        Geometry union = null;
+
+        CoordinateReferenceSystem covCRS = referenceCrs;
+
+        final AffineTransform gridToWorldCorner = (AffineTransform) ((GridGeometry2D) ciReference
+                .getGrid()).getGridToCRS2D(PixelOrientation.UPPER_LEFT);
+
+        // Union of all the Geometries
+        for (Geometry geo : rois) {
+            if (union == null) {
+                if (toRasterSpace) {
+                    union = JTS.transform(geo, ProjectiveTransform.create(gridToWorldCorner));
+                } else {
+                    union = geo;
+                }
+            } else {
+                if (toRasterSpace) {
+                    Geometry projected = JTS.transform(geo,
+                            ProjectiveTransform.create(gridToWorldCorner));
+                    union.union(projected);
+                } else {
+                    union.union(geo);
+                }
+            }
+        }
+        // Setting of the final srID and reproject to the final CRS
+        CoordinateReferenceSystem crs = (CoordinateReferenceSystem) union.getUserData();
+        if (crs != null) {
+            MathTransform trans = CRS.findMathTransform(crs, covCRS);
+            union = JTS.transform(union, trans);
+            union.setUserData(covCRS);
+        }
+
+        if (union.getSRID() == 0) {
+            int srIDfinal = CRS.lookupEpsgCode(covCRS, true);
+            union.setSRID(srIDfinal);
+        }
+
+        if (union.getUserData() == null) {
+            union.setUserData(covCRS);
+        }
+
+        GridGeometry2D gridROI = null;
+        
+        if (!union.isEmpty()) {
+            
+            //
+            // Make sure the provided area intersects the layer BBOX in the layer CRS
+            //
+            final ReferencedEnvelope crsBBOX = ciReference.boundingBox();
+            union = union.intersection(JTS.toGeometry(crsBBOX));
+            if (union.isEmpty()) {
+                throw new WPSException(
+                        "The provided Administrative Areas does not intersect the reference data BBOX: ",
+                        union.toText());
+            }
+            
+            com.vividsolutions.jts.geom.Envelope envelope = union.getEnvelopeInternal();
+            // create with supplied crs
+            Envelope2D bounds = JTS.getEnvelope2D(envelope, covCRS);
+
+            // Creation of a GridGeometry2D instance used for cropping the input images
+            gridROI = new GridGeometry2D(PixelInCell.CELL_CORNER,
+                    (MathTransform) gridToWorldCorner, bounds, null);
+        }
+        return gridROI;
     }
 }

@@ -62,9 +62,11 @@ import org.opengis.geometry.Envelope;
 import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
+import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.datum.PixelInCell;
 import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.TransformException;
 
 import com.vividsolutions.jts.geom.Geometry;
 
@@ -216,79 +218,9 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             params = CoverageUtilities.replaceParameter(params,
                     ImageMosaicFormat.USE_JAI_IMAGEREAD.getDefaultValue(),
                     ImageMosaicFormat.USE_JAI_IMAGEREAD);
-
-            // TODO
-            // if (gridROI != null) {
-            // params = CoverageUtilities.replaceParameter(params, gridROI,
-            // AbstractGridFormat.READ_GRIDGEOMETRY2D);
-            // }
-
-            // Creation of a Geometry union for cropping the input coverages
-            Geometry union = null;
-
-            CoordinateReferenceSystem covCRS = referenceCrs;
-
-            final AffineTransform gridToWorldCorner = (AffineTransform) ((GridGeometry2D) ciReference
-                    .getGrid()).getGridToCRS2D(PixelOrientation.UPPER_LEFT);
-
-            // Union of all the Geometries
-            for (Geometry geo : rois) {
-                if (union == null) {
-                    if (toRasterSpace) {
-                        union = JTS.transform(geo, ProjectiveTransform.create(gridToWorldCorner));
-                    } else {
-                        union = geo;
-                    }
-                } else {
-                    if (toRasterSpace) {
-                        Geometry projected = JTS.transform(geo,
-                                ProjectiveTransform.create(gridToWorldCorner));
-                        union.union(projected);
-                    } else {
-                        union.union(geo);
-                    }
-                }
-            }
-            // Setting of the final srID and reproject to the final CRS
-            CoordinateReferenceSystem crs = (CoordinateReferenceSystem) union.getUserData();
-            if (crs != null) {
-                MathTransform trans = CRS.findMathTransform(crs, covCRS);
-                union = JTS.transform(union, trans);
-                union.setUserData(covCRS);
-            }
-
-            if (union.getSRID() == 0) {
-                int srIDfinal = CRS.lookupEpsgCode(covCRS, true);
-                union.setSRID(srIDfinal);
-            }
-
-            if (union.getUserData() == null) {
-                union.setUserData(covCRS);
-            }
+            
             // Creation of a GridGeometry object used for forcing the reader to read only the active zones
-            GridGeometry2D gridROI = null;
-
-            if (!union.isEmpty()) {
-                
-                //
-                // Make sure the provided area intersects the layer BBOX in the layer CRS
-                //
-                final ReferencedEnvelope crsBBOX = ciReference.boundingBox();
-                union = union.intersection(JTS.toGeometry(crsBBOX));
-                if (union.isEmpty()) {
-                    throw new WPSException(
-                            "The provided Administrative Areas does not intersect the reference data BBOX: ",
-                            union.toText());
-                }
-                
-                com.vividsolutions.jts.geom.Envelope envelope = union.getEnvelopeInternal();
-                // create with supplied crs
-                Envelope2D bounds = JTS.getEnvelope2D(envelope, covCRS);
-
-                // Creation of a GridGeometry2D instance used for cropping the input images
-                gridROI = new GridGeometry2D(PixelInCell.CELL_CORNER,
-                        (MathTransform) gridToWorldCorner, bounds, null);
-            }
+            GridGeometry2D gridROI = createGridROI(ciReference, rois, toRasterSpace, referenceCrs);
 
             if (gridROI != null) {
                 params = CoverageUtilities.replaceParameter(params, gridROI,
@@ -321,12 +253,6 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
                     params = CoverageUtilities.replaceParameter(params, gridROI,
                             AbstractGridFormat.READ_GRIDGEOMETRY2D);
                 }
-
-                // TODO
-                // if (gridROI != null) {
-                // params = CoverageUtilities.replaceParameter(params, gridROI,
-                // AbstractGridFormat.READ_GRIDGEOMETRY2D);
-                // }
                 // TODO add tiling, reuse standard values from config
                 // TODO add background value, reuse standard values from config
                 nowCoverage = (GridCoverage2D) referenceReader.read(params);
@@ -446,12 +372,6 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
 
         // Selection of the images
         RenderedImage referenceImage = container.getReferenceImage();
-        //
-        // StatsType[] stats = new StatsType[]{StatsType.MAX};
-        //
-        // RenderedOp test = StatisticsDescriptor.create(inputCov.getRenderedImage(), 1, 1, null, null, false, new int[]{0}, stats, null);
-        //
-        // double mean = (Double) ((Statistics[][])test.getProperty(Statistics.STATS_PROPERTY))[0][0].getResult();
 
         RenderedImage nowImage = container.getNowImage();
 
