@@ -39,6 +39,7 @@ import org.geoserver.wps.gs.soilsealing.model.SoilSealingTime;
 import org.geoserver.wps.ppio.FeatureAttribute;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridGeometry2D;
+import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.data.DataUtilities;
 import org.geotools.data.collection.ListFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureCollection;
@@ -46,14 +47,18 @@ import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.filter.IsEqualsToImpl;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
+import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.JTSFactoryFinder;
+import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.process.ProcessException;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
+import org.geotools.referencing.operation.transform.ProjectiveTransform;
 import org.geotools.resources.image.ImageUtilities;
 import org.geotools.util.NullProgressListener;
 import org.geotools.util.logging.Logging;
@@ -68,6 +73,8 @@ import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.datum.PixelInCell;
+import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
 
 import com.vividsolutions.jts.geom.Geometry;
@@ -198,11 +205,14 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             params = CoverageUtilities.replaceParameter(params, referenceFilter, ImageMosaicFormat.FILTER);
             // merge USE_JAI_IMAGEREAD to false if needed
             params = CoverageUtilities.replaceParameter(params, ImageMosaicFormat.USE_JAI_IMAGEREAD.getDefaultValue(), ImageMosaicFormat.USE_JAI_IMAGEREAD);
-//          TODO
-//          if (gridROI != null) {
-//              params = CoverageUtilities.replaceParameter(params, gridROI,
-//                      AbstractGridFormat.READ_GRIDGEOMETRY2D);
-//          }
+            
+            GridGeometry2D gridROI = createGridROI(ciReference,rois,true, referenceCrs);
+
+            if (gridROI != null) {
+                params = CoverageUtilities.replaceParameter(params, gridROI,
+                        AbstractGridFormat.READ_GRIDGEOMETRY2D);
+            }
+            
             referenceCoverage = (GridCoverage2D) referenceReader.read(params);
 
             if (referenceCoverage == null) {
@@ -224,11 +234,12 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
                 params = CoverageUtilities.replaceParameter(params,
                         ImageMosaicFormat.USE_JAI_IMAGEREAD.getDefaultValue(),
                         ImageMosaicFormat.USE_JAI_IMAGEREAD);
-//                TODO
-//                if (gridROI != null) {
-//                    params = CoverageUtilities.replaceParameter(params, gridROI,
-//                            AbstractGridFormat.READ_GRIDGEOMETRY2D);
-//                }
+                
+                if (gridROI != null) {
+                    params = CoverageUtilities.replaceParameter(params, gridROI,
+                            AbstractGridFormat.READ_GRIDGEOMETRY2D);
+                }
+                
                 // TODO add tiling, reuse standard values from config
                 // TODO add background value, reuse standard values from config
                 nowCoverage = (GridCoverage2D) referenceReader.read(params);
@@ -624,5 +635,6 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
 
         return SOIL_INDEX_TYPE;
     }
+    
     
 }
