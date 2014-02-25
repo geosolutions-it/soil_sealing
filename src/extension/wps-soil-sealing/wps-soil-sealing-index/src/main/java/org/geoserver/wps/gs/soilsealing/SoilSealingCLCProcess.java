@@ -450,6 +450,7 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             }
             featureBuilder.add(municipalities.get(i));
             featureBuilder.add(value.getResults()[0]);
+            featureBuilder.add(value.getColor().getValue());
             SimpleFeature feature = featureBuilder.buildFeature(null);
             features.add(feature);
             i++;
@@ -548,6 +549,7 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
         builder.add("the_geom", MultiPolygon.class);
         builder.length(50).add("au_name", String.class); // <- 15 chars width for name field
         builder.add("value", Double.class);
+        builder.add("legend", Double.class);
         
         // build the type
         final SimpleFeatureType SOIL_INDEX_TYPE = builder.buildFeatureType();
