@@ -317,18 +317,36 @@ public class CLCProcess implements GSProcess {
 
                 double result = 0;
 
+                IndexColor color = null;
+                
                 if (coeff != null) {
                     result = (areaVar / popVar) * coeff;
                 } else {
-                    // Index result
-                    /*
-                     * if (areaVar >= 0) { if (popVar >= 0) { result = IndexColor.GREEN.getValue(); } else { result = IndexColor.YELLOW.getValue(); }
-                     * } else { if (popVar >= 0) { result = IndexColor.RED.getValue(); } else { result = IndexColor.BLUE.getValue(); } }
-                     */
                     result = areaVar / popVar;
                 }
+                
+                // Index result
+                if (areaVar >= 0) {
+                    if (popVar >= 0) {
+                        color = IndexColor.GREEN;
+                    } else {
+                        color = IndexColor.YELLOW;
+                    }
+                } else {
+                    if (popVar >= 0) {
+                        color = IndexColor.RED;
+                    } else {
+                        color = IndexColor.BLUE;
+                    }
+                }
+                
                 // Addition of the Statistics to a List
-                container.add(new StatisticContainer(geo, new double[] { result }, null));
+                StatisticContainer statisticContainer = new StatisticContainer(geo, new double[] { result }, null);
+                // Setting of the color to use
+                if(color!=null){
+                    statisticContainer.setColor(color);
+                }
+                container.add(statisticContainer);
                 // Update of the Zones
                 countZones++;
             }
@@ -349,14 +367,24 @@ public class CLCProcess implements GSProcess {
                 Geometry geo = ((ROIGeometry) zone.getROI()).getAsGeometry();
 
                 double sprawl = areaTa / popTa;
-                /*
-                 * double result = 0;
-                 * 
-                 * if (sprawl > UPPER_BOUND_INDEX_4) { result = IndexColor.RED.getValue(); } else if (sprawl < LOWER_BOUND_INDEX_4) { result =
-                 * IndexColor.GREEN.getValue(); } else { result = IndexColor.YELLOW.getValue(); }
-                 */
+                
+                IndexColor color = null;
+                
+                if (sprawl > UPPER_BOUND_INDEX_4) {
+                    color = IndexColor.RED;
+                } else if (sprawl < LOWER_BOUND_INDEX_4) {
+                    color = IndexColor.GREEN;
+                } else {
+                    color = IndexColor.YELLOW;
+                }
+                
                 // Addition of the Statistics to a List
-                container.add(new StatisticContainer(geo, new double[] { sprawl }, null));
+                StatisticContainer statisticContainer = new StatisticContainer(geo, new double[] { sprawl }, null);
+             // Setting of the color to use
+                if(color!=null){
+                    statisticContainer.setColor(color);
+                }
+                container.add(statisticContainer);
 
                 // Update of the Zones
                 countZones++;
@@ -479,6 +507,8 @@ public class CLCProcess implements GSProcess {
         private RenderedImage nowImage;
 
         private RenderedImage diffImage;
+        
+        private IndexColor color;
 
         public StatisticContainer() {
         }
@@ -547,6 +577,14 @@ public class CLCProcess implements GSProcess {
 
         public void setDiffImage(RenderedImage diffImage) {
             this.diffImage = diffImage;
+        }
+
+        public IndexColor getColor() {
+            return color;
+        }
+
+        public void setColor(IndexColor color) {
+            this.color = color;
         }
     }
 }
