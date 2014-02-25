@@ -7,11 +7,11 @@ package org.geoserver.wps.gs.soilsealing.model;
 public class SoilSealingIndex {
 
     private int id;
-    private String name;
-    public SoilSealingIndex(int id, String name) {
+    private String subindex;
+    public SoilSealingIndex(int id, String subindex) {
         super();
         this.id = id;
-        this.name = name;
+        this.subindex = subindex;
     }
     /**
      * @return the id
@@ -26,16 +26,16 @@ public class SoilSealingIndex {
         this.id = id;
     }
     /**
-     * @return the name
+     * @return the subindex
      */
-    public String getName() {
-        return name;
+    public String getSubindex() {
+        return subindex;
     }
     /**
-     * @param name the name to set
+     * @param subindex the subindex to set
      */
-    public void setName(String name) {
-        this.name = name;
+    public void setSubindex(String subindex) {
+        this.subindex = subindex;
     }
     
     

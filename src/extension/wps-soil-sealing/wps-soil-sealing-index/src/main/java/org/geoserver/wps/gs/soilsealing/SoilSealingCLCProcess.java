@@ -4,8 +4,10 @@
  */
 package org.geoserver.wps.gs.soilsealing;
 
+import java.awt.geom.AffineTransform;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +15,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 
 import javax.media.jai.RenderedOp;
 
@@ -23,6 +24,7 @@ import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.data.util.CoverageUtils;
 import org.geoserver.wps.WPSException;
+import org.geoserver.wps.gs.ImportProcess;
 import org.geoserver.wps.gs.ToFeature;
 import org.geoserver.wps.gs.WFSLog;
 import org.geoserver.wps.gs.soilsealing.CLCProcess.StatisticContainer;
@@ -31,22 +33,40 @@ import org.geoserver.wps.gs.soilsealing.model.SoilSealingIndex;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingOutput;
 import org.geoserver.wps.gs.soilsealing.model.SoilSealingTime;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.GridGeometry2D;
+import org.geotools.data.DataUtilities;
 import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.feature.simple.SimpleFeatureBuilder;
+import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.filter.IsEqualsToImpl;
 import org.geotools.gce.imagemosaic.ImageMosaicFormat;
+import org.geotools.geometry.jts.JTS;
+import org.geotools.geometry.jts.JTSFactoryFinder;
 import org.geotools.process.ProcessException;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.geotools.resources.image.ImageUtilities;
 import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridCoverageReader;
+import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
+import org.opengis.geometry.MismatchedDimensionException;
+import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.TransformException;
 
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.MultiPolygon;
+import com.vividsolutions.jts.geom.Polygon;
 
 /**
  * Middleware process collecting the inputs for {@link CLCProcess} indexes.
@@ -94,6 +114,7 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             @DescribeParameter(name = "referenceFilter", description = "Filter to use on the raster data", min = 1) Filter referenceFilter,
             @DescribeParameter(name = "nowFilter", description = "Filter to use on the raster data", min = 0) Filter nowFilter,
             @DescribeParameter(name = "index", min = 1, description = "Index to calculate") int index,
+            @DescribeParameter(name = "subindex", min = 0, description = "String indicating which sub-index must be calculated {a,b,c}") String subIndex,
             @DescribeParameter(name = "classes", collectionType = Integer.class, min = 0, description = "The domain of the classes used in input rasters") Set<Integer> classes,
             @DescribeParameter(name = "geocoderLayer", description = "Name of the geocoder layer, optionally fully qualified (workspace:name)") String geocoderLayer,
             @DescribeParameter(name = "geocoderPopulationLayer", description = "Name of the geocoder population layer, optionally fully qualified (workspace:name)") String geocoderPopulationLayer,
@@ -253,22 +274,22 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             // ///////////////////////////////////////////////////////////////
             final CLCProcess clcProcess = new CLCProcess();
             
-            LOGGER.finer("Invocking the CLCProcess with the following parameters: ");
+            /*LOGGER.finer("Invocking the CLCProcess with the following parameters: ");
             LOGGER.finer(" --> referenceCoverage: " + referenceCoverage);
             LOGGER.finer(" --> nowCoverage: " + nowCoverage);
             LOGGER.finer(" --> classes: " + classes);
             LOGGER.finer(" --> index: " + index);
             LOGGER.finer(" --> rois(" + rois.size() + ")");
-            LOGGER.finer(" --> populations(" + populations.size() + ")");
+            LOGGER.finer(" --> populations(" + populations.size() + ")");*/
             
-            List<StatisticContainer> indexValue = clcProcess.execute(referenceCoverage, nowCoverage, classes, index, null, rois, populations, null, true);
+            List<StatisticContainer> indexValue = clcProcess.execute(referenceCoverage, nowCoverage, classes, index, null, rois, populations, null, (index != 3 && index != 4));
             
             // ///////////////////////////////////////////////////////////////
             // Preparing the Output Object which will be JSON encoded
             // ///////////////////////////////////////////////////////////////
             SoilSealingDTO soilSealingIndexResult = new SoilSealingDTO();
             
-            SoilSealingIndex soilSealingIndex = new SoilSealingIndex(index, "");
+            SoilSealingIndex soilSealingIndex = new SoilSealingIndex(index, subIndex);
             soilSealingIndexResult.setIndex(soilSealingIndex);
             
             double[][] refValues = new double[indexValue.size()][];
@@ -298,6 +319,15 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
                 SoilSealingOutput soilSealingCurTimeOutput = new SoilSealingOutput(referenceName, (String[]) municipalities.toArray(new String[1]), clcLevels, curValues);
                 SoilSealingTime soilSealingCurTime = new SoilSealingTime(((IsEqualsToImpl) nowFilter).getExpression2().toString(), soilSealingCurTimeOutput);
                 soilSealingIndexResult.setCurTime(soilSealingCurTime);
+            }
+            
+            // ////////////////////////////////////////////////////////////////////////////
+            // Create Vectorial Layers for indexes 3 and 4
+            // ////////////////////////////////////////////////////////////////////////////
+            switch (index) {
+            case 3:
+            case 4:
+                buildVectorialLayerMap(wsName, storeName, municipalities, indexValue, soilSealingIndexResult, ciReference, defaultStyle);
             }
             
             return soilSealingIndexResult;
@@ -345,4 +375,186 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
         }
     }
 
+    /**
+     * This method creates shapefiles for indexes 3 and 4.
+     * Enables than the layer on the map.
+     * @param municipalities 
+     * 
+     * @param refWsName 
+     * @param storeName 
+     * @param municipalities 
+     * @param indexValue
+     * @param soilSealingIndexResult
+     * @param ciReference 
+     * @param defaultStyle 
+     * @throws IOException 
+     * @throws FactoryException 
+     * @throws NoSuchAuthorityCodeException 
+     * @throws TransformException 
+     * @throws MismatchedDimensionException 
+     */
+    private void buildVectorialLayerMap(String refWsName, String storeName, List<String> municipalities, List<StatisticContainer> indexValue,
+            SoilSealingDTO soilSealingIndexResult, CoverageInfo ciReference, String defaultStyle) throws IOException, NoSuchAuthorityCodeException, FactoryException, MismatchedDimensionException, TransformException {
+        
+        /**
+         * Create a FeatureType
+         */
+        
+        /*
+         * We use the DataUtilities class to create a FeatureType that will describe the data in our
+         * shapefile.
+         * 
+         * See also the createFeatureType method below for another, more flexible approach.
+         */
+        /*final SimpleFeatureType TYPE = DataUtilities.createType("Location",
+                "the_geom:Point:srid=4326," + // <- the geometry attribute: Point type
+                "name:String," +   // <- a String attribute
+                "number:Integer"   // a number attribute
+        );*/
+        final String refName = soilSealingIndexResult.getRefTime().getOutput().getReferenceName();
+        final String shpName = (refName.indexOf(":") < 0 ? refName : refName.substring(refName.indexOf(":")+1));
+//        final File shpFolder = (GeoserverDataDirectory.findDataFile("soil_index_shps") != null ? 
+//                GeoserverDataDirectory.findDataFile("soil_index_shps") : new File(GeoserverDataDirectory.getGeoserverDataDirectory(), "soil_index_shps"));
+//        if (!shpFolder.exists()) shpFolder.mkdirs();
+//        final File shpFile = File.createTempFile(shpName, ".shp", shpFolder);
+        final SimpleFeatureType TYPE = createFeatureType(shpName + System.nanoTime());
+        
+        /**
+         * Create Features
+         */
+        
+        /*
+         * A list to collect features as we create them.
+         */
+        List<SimpleFeature> features = new ArrayList<SimpleFeature>();
+        
+        // //
+        // GRID TO WORLD preparation from reference
+        // //
+        final AffineTransform gridToWorldCorner = (AffineTransform) ((GridGeometry2D) ciReference.getGrid()).getGridToCRS2D(PixelOrientation.UPPER_LEFT);
+        
+        /*
+         * GeometryFactory will be used to create the geometry attribute of each feature,
+         * using a Multipolygon object for the geometry.
+         */
+        GeometryFactory geometryFactory = JTSFactoryFinder.getGeometryFactory();
+
+        SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(TYPE);
+
+        int i = 0;
+        for (StatisticContainer value : indexValue) {
+            if (value.getGeom() instanceof MultiPolygon) {
+                featureBuilder.add(JTS.transform(value.getGeom(), new AffineTransform2D(gridToWorldCorner)));
+            } else {
+                featureBuilder.add(JTS.transform(geometryFactory.createMultiPolygon(new Polygon[] {(Polygon) value.getGeom()}), new AffineTransform2D(gridToWorldCorner)));
+            }
+            featureBuilder.add(municipalities.get(i));
+            featureBuilder.add(value.getResults()[0]);
+            featureBuilder.add(value.getColor().getValue());
+            SimpleFeature feature = featureBuilder.buildFeature(null);
+            features.add(feature);
+            i++;
+        }
+        
+//        /**
+//         * Create a shapeFile from a FeatureCollection
+//         */
+//        
+//        /*
+//         * Get an output file name and create the new shapefile
+//         */
+//        ShapefileDataStoreFactory dataStoreFactory = new ShapefileDataStoreFactory();
+//
+//        Map<String, Serializable> params = new HashMap<String, Serializable>();
+//        params.put("url", shpFile.toURI().toURL());
+//        params.put("create spatial index", Boolean.TRUE);
+//
+//        ShapefileDataStore newDataStore = (ShapefileDataStore) dataStoreFactory.createNewDataStore(params);
+//
+//        /*
+//         * TYPE is used as a template to describe the file contents
+//         */
+//        newDataStore.createSchema(TYPE);
+//        
+//        /**
+//         * Write the feature data to the shapefile
+//         */
+//        
+//        /*
+//         * Write the features to the shapefile
+//         */
+//        Transaction transaction = new DefaultTransaction("create");
+//
+//        String typeName = newDataStore.getTypeNames()[0];
+//        SimpleFeatureSource featureSource = newDataStore.getFeatureSource(typeName);
+//        SimpleFeatureType SHAPE_TYPE = featureSource.getSchema();
+//        /*
+//         * The Shapefile format has a couple limitations:
+//         * - "the_geom" is always first, and used for the geometry attribute name
+//         * - "the_geom" must be of type Point, MultiPoint, MuiltiLineString, MultiPolygon
+//         * - Attribute names are limited in length 
+//         * - Not all data types are supported (example Timestamp represented as Date)
+//         * 
+//         * Each data store has different limitations so check the resulting SimpleFeatureType.
+//         */
+//        LOGGER.fine("SHAPE:"+SHAPE_TYPE);
+//
+//        if (featureSource instanceof SimpleFeatureStore) {
+//            SimpleFeatureStore featureStore = (SimpleFeatureStore) featureSource;
+//            /*
+//             * SimpleFeatureStore has a method to add features from a
+//             * SimpleFeatureCollection object, so we use the ListFeatureCollection
+//             * class to wrap our list of features.
+//             */
+//            SimpleFeatureCollection collection = new ListFeatureCollection(TYPE, features);
+//            featureStore.setTransaction(transaction);
+//            try {
+//                featureStore.addFeatures(collection);
+//                transaction.commit();
+//            } catch (Exception problem) {
+//                problem.printStackTrace();
+//                transaction.rollback();
+//            } finally {
+//                transaction.close();
+//            }
+//        } else {
+//            throw new IOException(typeName + " does not support read/write access");
+//        }
+        
+        /**
+         * Import the Feature Collection as a new Layer
+         */
+        final String layerName = shpName + System.nanoTime();
+        ImportProcess importProcess = new ImportProcess(catalog);
+        importProcess.execute(DataUtilities.collection(features), null, refWsName, storeName, layerName, ciReference.getCRS(), null, defaultStyle);
+        
+        soilSealingIndexResult.getRefTime().getOutput().setLayerName(refWsName + ":" + layerName);
+    }
+
+    /**
+     * Here is how you can use a SimpleFeatureType builder to create the schema for your shapefile
+     * dynamically.
+     * <p>
+     * This method is an improvement on the code used in the main method above (where we used
+     * DataUtilities.createFeatureType) because we can set a Coordinate Reference System for the
+     * FeatureType and a a maximum field length for the 'name' field
+     */
+    private static SimpleFeatureType createFeatureType(String name) {
+
+        SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
+        builder.setName(name);
+        builder.setCRS(DefaultGeographicCRS.WGS84); // <- Coordinate reference system
+
+        // add attributes in order
+        builder.add("the_geom", MultiPolygon.class);
+        builder.length(50).add("au_name", String.class); // <- 15 chars width for name field
+        builder.add("value", Double.class);
+        builder.add("legend", Double.class);
+        
+        // build the type
+        final SimpleFeatureType SOIL_INDEX_TYPE = builder.buildFeatureType();
+
+        return SOIL_INDEX_TYPE;
+    }
+    
 }

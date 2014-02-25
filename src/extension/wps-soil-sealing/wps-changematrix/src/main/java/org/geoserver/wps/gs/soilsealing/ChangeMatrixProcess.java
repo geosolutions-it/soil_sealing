@@ -456,9 +456,7 @@ public class ChangeMatrixProcess implements GSProcess {
             try {
                 ImportProcess importProcess = new ImportProcess(catalog);
                 GridCoverage2D retOvValue = gtiffReader.read(wps);
-                importProcess.execute(null, retOvValue, wsName, null,
-                        retValue.getName().toString(), retValue.getCoordinateReferenceSystem(),
-                        null, defaultStyle);
+                importProcess.execute(null, retOvValue, wsName, null, retValue.getName().toString(), retValue.getCoordinateReferenceSystem(), null, defaultStyle);
             } finally {
                 if (gtiffReader != null) {
                     gtiffReader.dispose();
@@ -485,8 +483,7 @@ public class ChangeMatrixProcess implements GSProcess {
             // build the feature
             feature.setAttribute("runEnd", new Date());
             feature.setAttribute("itemStatus", "COMPLETED");
-            feature.setAttribute("itemStatusMessage",
-                    "Change Matrix Process completed successfully");
+            feature.setAttribute("itemStatusMessage", "Change Matrix Process completed successfully");
             feature.setAttribute("layerName", rasterName);
             feature.setAttribute("changeMatrix", JSONSerializer.toJSON(changeMatrix).toString());
 
@@ -517,10 +514,7 @@ public class ChangeMatrixProcess implements GSProcess {
                 // build the feature
                 feature.setAttribute("runEnd", new Date());
                 feature.setAttribute("itemStatus", "FAILED");
-                feature.setAttribute(
-                        "itemStatusMessage",
-                        "There was an error while while processing Input parameters: "
-                                + e.getMessage());
+                feature.setAttribute("itemStatusMessage", "There was an error while while processing Input parameters: " + e.getMessage());
 
                 ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
                 output.add(feature);

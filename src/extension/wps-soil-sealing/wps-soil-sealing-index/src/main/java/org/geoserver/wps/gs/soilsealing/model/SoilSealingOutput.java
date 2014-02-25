@@ -6,6 +6,8 @@ package org.geoserver.wps.gs.soilsealing.model;
 
 public class SoilSealingOutput {
     private String referenceName;
+    
+    private String layerName;
 
     private String[] admUnits;
 
@@ -39,6 +41,20 @@ public class SoilSealingOutput {
      */
     public void setReferenceName(String referenceName) {
         this.referenceName = referenceName;
+    }
+
+    /**
+     * @return the layerName
+     */
+    public String getLayerName() {
+        return layerName;
+    }
+
+    /**
+     * @param layerName the layerName to set
+     */
+    public void setLayerName(String layerName) {
+        this.layerName = layerName;
     }
 
     /**
