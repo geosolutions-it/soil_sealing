@@ -12,6 +12,7 @@ public class SoilSealingDTO {
     private SoilSealingIndex index;
     private SoilSealingTime curTime;
     private SoilSealingTime refTime;
+    private String diffImageName;
     
     /**
      * Default Constructor
@@ -60,6 +61,14 @@ public class SoilSealingDTO {
      */
     public void setRefTime(SoilSealingTime refTime) {
         this.refTime = refTime;
+    }
+
+    public String getDiffImageName() {
+        return diffImageName;
+    }
+
+    public void setDiffImageName(String diffImageName) {
+        this.diffImageName = diffImageName;
     }
     
     
