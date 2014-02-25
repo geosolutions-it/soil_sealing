@@ -336,24 +336,20 @@ public class ChangeMatrixProcess implements GSProcess {
             attributes.add(new FeatureAttribute("layerName", ""));
             attributes.add(new FeatureAttribute("changeMatrix", ""));
 
-            features = toFeatureProcess.execute(JTS.toGeometry(ciReference.getNativeBoundingBox()),
-                    ciReference.getCRS(), typeName, attributes, null);
+            features = toFeatureProcess.execute(JTS.toGeometry(ciReference.getNativeBoundingBox()), ciReference.getCRS(), typeName, attributes, null);
 
             if (features == null || features.isEmpty()) {
-                throw new ProcessException(
-                        "There was an error while converting attributes into FeatureType.");
+                throw new ProcessException("There was an error while converting attributes into FeatureType.");
             }
 
             /**
              * LOG into the DB
              */
             filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
-            features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true,
-                    new NullProgressListener());
+            features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true, new NullProgressListener());
 
             if (features == null || features.isEmpty()) {
-                throw new ProcessException(
-                        "There was an error while logging FeatureType into the storage.");
+                throw new ProcessException("There was an error while logging FeatureType into the storage.");
             }
 
             // //////////////////////////////////////////////////////////////////////
@@ -427,10 +423,8 @@ public class ChangeMatrixProcess implements GSProcess {
 
             // setting the write parameters for this geotiff
             final ParameterValueGroup gtiffParams = new GeoTiffFormat().getWriteParameters();
-            gtiffParams.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString())
-                    .setValue(CoverageImporter.DEFAULT_WRITE_PARAMS);
-            final GeneralParameterValue[] wps = (GeneralParameterValue[]) gtiffParams.values()
-                    .toArray(new GeneralParameterValue[1]);
+            gtiffParams.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(CoverageImporter.DEFAULT_WRITE_PARAMS);
+            final GeneralParameterValue[] wps = (GeneralParameterValue[]) gtiffParams.values().toArray(new GeneralParameterValue[1]);
 
             try {
                 writer.write(retValue, wps);
@@ -477,8 +471,7 @@ public class ChangeMatrixProcess implements GSProcess {
              */
             filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
 
-            SimpleFeature feature = SimpleFeatureBuilder.copy(features.subCollection(filter)
-                    .toArray(new SimpleFeature[1])[0]);
+            SimpleFeature feature = SimpleFeatureBuilder.copy(features.subCollection(filter).toArray(new SimpleFeature[1])[0]);
 
             // build the feature
             feature.setAttribute("runEnd", new Date());
