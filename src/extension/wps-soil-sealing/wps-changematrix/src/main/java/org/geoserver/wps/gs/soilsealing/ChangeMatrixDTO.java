@@ -18,6 +18,8 @@ import java.util.TreeSet;
 public class ChangeMatrixDTO {
 
     private String rasterName = null;
+    private String refYear = null;
+    private String nowYear = null;
 
     /**
      * The implementation of the changeMatrix as a Set
@@ -30,7 +32,7 @@ public class ChangeMatrixDTO {
      * @param classes
      * @param cm
      */
-    public ChangeMatrixDTO(ChangeMatrix cm, Set<Integer> classes, String rasterName, Double multiplier) {
+    public ChangeMatrixDTO(ChangeMatrix cm, Set<Integer> classes, String rasterName, String refYear, String nowYear, Double multiplier) {
         
         double value = 1;
         
@@ -39,6 +41,8 @@ public class ChangeMatrixDTO {
         }
         
         this.setRasterName(rasterName);
+        if (refYear != null) this.setRefYear(refYear);
+        if (nowYear != null) this.setNowYear(nowYear);
 
         for (Integer elRef : classes) {
             for (Integer elNow : classes) {
@@ -55,8 +59,8 @@ public class ChangeMatrixDTO {
      * @param classes
      * @param cm
      */
-    public ChangeMatrixDTO(ChangeMatrix cm, Set<Integer> classes, String rasterName) {
-        this(cm,classes,rasterName,null);
+    public ChangeMatrixDTO(ChangeMatrix cm, Set<Integer> classes, String rasterName, String refYear, String nowYear) {
+        this(cm, classes, rasterName, refYear, nowYear, null);
     }
 
     /**
@@ -95,6 +99,34 @@ public class ChangeMatrixDTO {
      */
     public String getRasterName() {
         return rasterName;
+    }
+
+    /**
+     * @return the refYear
+     */
+    public String getRefYear() {
+        return refYear;
+    }
+
+    /**
+     * @param refYear the refYear to set
+     */
+    public void setRefYear(String refYear) {
+        this.refYear = refYear;
+    }
+
+    /**
+     * @return the nowYear
+     */
+    public String getNowYear() {
+        return nowYear;
+    }
+
+    /**
+     * @param nowYear the nowYear to set
+     */
+    public void setNowYear(String nowYear) {
+        this.nowYear = nowYear;
     }
 
 }

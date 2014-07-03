@@ -21,6 +21,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.media.jai.JAI;
 import javax.media.jai.ParameterBlockJAI;
@@ -405,6 +407,27 @@ public class ChangeMatrixProcess implements GSProcess {
             final Hints hints = GeoTools.getDefaultHints().clone();
 
             final String rasterName = ciReference.getName() + "_cm_" + System.nanoTime();
+            
+            String refYear = null;
+            String nowYear = null;
+            
+            Pattern pattern = Pattern.compile("(\\d{4}?)");
+            if (referenceFilter != null) {
+                Matcher matcher = pattern.matcher(referenceFilter.toString());
+                if (matcher.find())
+                {
+                    refYear = matcher.group(1);
+                }
+            }
+            
+            if (nowFilter != null) {
+                Matcher matcher = pattern.matcher(nowFilter.toString());
+                if (matcher.find())
+                {
+                    nowYear = matcher.group(1);
+                }
+            }
+            
             final GridCoverage2D retValue = new GridCoverageFactory(hints).create(rasterName,
                     result, referenceCoverage.getEnvelope());
             
@@ -413,7 +436,7 @@ public class ChangeMatrixProcess implements GSProcess {
              */
             // Value used for converting the counted pixels into areas (UOM=ha)
             double multiplier = HACONVERTER*PIXEL_AREA;
-            final ChangeMatrixDTO changeMatrix = new ChangeMatrixDTO(cm, classes, rasterName,multiplier);
+            final ChangeMatrixDTO changeMatrix = new ChangeMatrixDTO(cm, classes, rasterName, refYear, nowYear, multiplier);
 
             /**
              * Add Overviews...
