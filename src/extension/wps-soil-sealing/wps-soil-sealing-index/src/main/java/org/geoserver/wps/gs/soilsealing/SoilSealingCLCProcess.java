@@ -304,8 +304,8 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
             attributes.add(new FeatureAttribute("defaultStyle", defaultStyle));
             attributes.add(new FeatureAttribute("referenceFilter", referenceFilter.toString()));
             attributes.add(new FeatureAttribute("nowFilter", (nowFilter != null ? nowFilter.toString() : "")));
-            attributes.add(new FeatureAttribute("index", index));
-            attributes.add(new FeatureAttribute("subindex", (subIndex != null ? subIndex : "")));
+            attributes.add(new FeatureAttribute("index", getSealingIndex(index)));
+            attributes.add(new FeatureAttribute("subindex", (subIndex != null ? getSealingSubIndex(subIndex) : "")));
             attributes.add(new FeatureAttribute("classes", (classes != null ? Arrays.toString(classes.toArray(new Integer[1])) : "")));
             attributes.add(new FeatureAttribute("admUnits", admUnits));
             attributes.add(new FeatureAttribute("admUnitSelectionType", admUnitSelectionType));
@@ -452,6 +452,68 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
                 nowCoverage.dispose(true);
             }
         }
+    }
+
+    /**
+     * 
+     * @param index
+     * @return
+     */
+    private String getSealingIndex(int index) {
+        String indexName = "";
+        
+        switch(index) {
+        case 1:
+            indexName = "Coverage coefficient";
+            break;
+        case 2:
+            indexName = "Rate of Change";
+            break;
+        case 3:
+            indexName = "Marginal Land Take";
+            break;
+        case 4:
+            indexName = "Urban Sprawl Indicator";
+            break;
+        case 5:
+            indexName = "Urban Dispersion";
+            break;
+        case 6:
+            indexName = "Edge Density";
+            break;
+        case 7:
+            indexName = "Dispersive Urban Growth";
+            break;
+        case 8:
+            indexName = "Fragmentation";
+            break;
+        case 9:
+            indexName = "Land Take";
+            break;
+        case 10:
+            indexName = "Environmental Impact of Land Take";
+            break;
+        }
+        
+        return indexName;
+    }
+    
+    /**
+     * 
+     * @param index
+     * @return
+     */
+    private String getSealingSubIndex(String index) {
+        String indexName = "";
+        
+        if(index == "a")
+            indexName = "Urban Area";
+        else if(index == "b")
+            indexName = "Highest Polygon Ratio";
+        else if(index == "c")
+            indexName = "Other Polygons Ratio";
+        
+        return indexName;
     }
 
     /**
