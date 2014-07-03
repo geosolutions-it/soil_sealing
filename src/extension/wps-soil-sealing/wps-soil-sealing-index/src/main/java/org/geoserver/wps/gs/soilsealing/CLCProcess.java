@@ -69,7 +69,7 @@ public class CLCProcess implements GSProcess {
     /** Lower Bound used for index 4 */
     public static final double LOWER_BOUND_INDEX_4 = 0.5d;
 
-    public static final String JAI_EXT_PRODUCT = "it.geosolutions.jaiext.roiaware";
+    public static final String JAI_EXT_PRODUCT = "it.geosolutions.jaiext";
     static {
         try {
             Registry.registerRIF(JAI.getDefaultInstance(), new BandMergeDescriptor(), new BandMergeCRIF(), JAI_EXT_PRODUCT);

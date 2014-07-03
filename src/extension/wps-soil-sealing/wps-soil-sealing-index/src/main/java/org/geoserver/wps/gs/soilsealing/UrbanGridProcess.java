@@ -130,7 +130,7 @@ public class UrbanGridProcess implements GSProcess {
     /** Default Pixel Area */
     private static final double PIXEL_AREA = 400;
 
-    public static final String JAI_EXT_PRODUCT = "it.geosolutions.jaiext.roiaware";
+    public static final String JAI_EXT_PRODUCT = "it.geosolutions.jaiext";
     static {
         try {
             Registry.registerRIF(JAI.getDefaultInstance(), new BufferDescriptor(), new BufferRIF(), JAI_EXT_PRODUCT);
