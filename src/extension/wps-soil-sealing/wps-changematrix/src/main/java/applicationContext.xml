@@ -11,6 +11,7 @@
 	<bean id="changeMatrix" class="org.geoserver.wps.gs.soilsealing.ChangeMatrixProcess">
 		<constructor-arg index="0" ref="catalog" />
 		<constructor-arg index="1" ref="geoServer" />
+		<property name="ptxfilename" value="/opt/soil_sealing/cudacodes/changemat.ptx"/>
 	</bean>
 	<bean id="changeMatrixDeleteTransactionListener"
 		class="org.geoserver.wps.gs.soilsealing.ChangeMatrixDeleteTransactionListener">
