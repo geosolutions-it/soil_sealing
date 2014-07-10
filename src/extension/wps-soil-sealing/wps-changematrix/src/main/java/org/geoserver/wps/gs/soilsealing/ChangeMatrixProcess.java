@@ -39,6 +39,7 @@ import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.SampleModel;
 import java.awt.image.WritableRaster;
+import java.awt.image.renderable.ParameterBlock;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -81,6 +82,8 @@ import org.geoserver.config.CoverageAccessInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.data.util.CoverageUtils;
 import org.geoserver.wps.WPSException;
+import org.geoserver.wps.area.AreaDescriptor;
+import org.geoserver.wps.area.AreaRIF;
 import org.geoserver.wps.gs.CoverageImporter;
 import org.geoserver.wps.gs.ImportProcess;
 import org.geoserver.wps.gs.ToFeature;
@@ -147,6 +150,8 @@ public class ChangeMatrixProcess implements GSProcess {
     static {
         Registry.registerRIF(JAI.getDefaultInstance(), new ChangeMatrixDescriptor(),
                 new ChangeMatrixRIF(), Registry.JAI_TOOLS_PRODUCT);
+        Registry.registerRIF(JAI.getDefaultInstance(), new AreaDescriptor(),
+                new AreaRIF(), "org.soil.sealing");
     }
 
     // Create the PTX file by calling the NVCC
@@ -155,8 +160,10 @@ public class ChangeMatrixProcess implements GSProcess {
     private final static boolean DEBUG = Boolean.getBoolean("org.geoserver.wps.debug");
 
     private static final int PIXEL_MULTY_ARG_INDEX = 100;
-    
+
     private static final int TOTAL_CLASSES = 44;
+
+    private static final double HACONVERTER = 0.0001f;
 
     private static final FilterFactory ff = CommonFactoryFinder.getFilterFactory(null);
 
@@ -166,7 +173,7 @@ public class ChangeMatrixProcess implements GSProcess {
     private Catalog catalog;
 
     private GeoServer geoserver;
-    
+
     public ChangeMatrixProcess(Catalog catalog, GeoServer geoserver) {
         this.catalog = catalog;
         this.geoserver = geoserver;
@@ -197,13 +204,12 @@ public class ChangeMatrixProcess implements GSProcess {
         if (DEBUG) {
             return getTestMap();
         }
-        
+
         // Check if JCUDA must be used for calculations
         boolean jcuda = false;
-        if(jCudaEnabled != null){
+        if (jCudaEnabled != null) {
             jcuda = jCudaEnabled;
         }
-        
 
         // get the original Coverages
         CoverageInfo ciReference = catalog.getCoverageByName(referenceName);
@@ -322,8 +328,8 @@ public class ChangeMatrixProcess implements GSProcess {
             params = CoverageUtilities.replaceParameter(params, referenceFilter,
                     ImageMosaicFormat.FILTER);
             // merge USE_JAI_IMAGEREAD to false if needed
-            params = CoverageUtilities.replaceParameter(params,
-                    !jcuda, ImageMosaicFormat.USE_JAI_IMAGEREAD);
+            params = CoverageUtilities.replaceParameter(params, !jcuda,
+                    ImageMosaicFormat.USE_JAI_IMAGEREAD);
             if (gridROI != null) {
                 params = CoverageUtilities.replaceParameter(params, gridROI,
                         AbstractGridFormat.READ_GRIDGEOMETRY2D);
@@ -344,8 +350,8 @@ public class ChangeMatrixProcess implements GSProcess {
             params = CoverageUtilities
                     .replaceParameter(params, nowFilter, ImageMosaicFormat.FILTER);
             // merge USE_JAI_IMAGEREAD to false if needed
-            params = CoverageUtilities.replaceParameter(params,
-                    !jcuda, ImageMosaicFormat.USE_JAI_IMAGEREAD);
+            params = CoverageUtilities.replaceParameter(params, !jcuda,
+                    ImageMosaicFormat.USE_JAI_IMAGEREAD);
             if (gridROI != null) {
                 params = CoverageUtilities.replaceParameter(params, gridROI,
                         AbstractGridFormat.READ_GRIDGEOMETRY2D);
@@ -383,7 +389,8 @@ public class ChangeMatrixProcess implements GSProcess {
             attributes.add(new FeatureAttribute("layerName", ""));
             attributes.add(new FeatureAttribute("changeMatrix", ""));
 
-            features = toFeatureProcess.execute(JTS.toGeometry(ciReference.getNativeBoundingBox()), ciReference.getCRS(), typeName, attributes, null);
+            features = toFeatureProcess.execute(JTS.toGeometry(ciReference.getNativeBoundingBox()),
+                    ciReference.getCRS(), typeName, attributes, null);
 
             if (features == null || features.isEmpty()) {
                 throw new ProcessException("There was an error while converting attributes into FeatureType.");
@@ -409,25 +416,35 @@ public class ChangeMatrixProcess implements GSProcess {
             Pattern pattern = Pattern.compile("(\\d{4}?)");
             if (referenceFilter != null) {
                 Matcher matcher = pattern.matcher(referenceFilter.toString());
-                if (matcher.find())
-                {
+                if (matcher.find()) {
                     refYear = matcher.group(1);
                 }
             }
 
             if (nowFilter != null) {
                 Matcher matcher = pattern.matcher(nowFilter.toString());
-                if (matcher.find())
-                {
+                if (matcher.find()) {
                     nowYear = matcher.group(1);
                 }
             }
+            // Calculation of the Area Image
+            GridGeometry2D gg2D = referenceCoverage.getGridGeometry();
+            ParameterBlock pb = new ParameterBlock();
+            pb.setSource(referenceCoverage.getRenderedImage(), 0);
+            pb.set(new ReferencedEnvelope(gg2D.getEnvelope()), 0);
+            pb.set(HACONVERTER, 1);
+            pb.set(classes, 2);
+            if(roiObj != null){
+                pb.set(roiObj, 3);
+            }
+            RenderedOp areaImage = JAI.create("area", pb);
 
             // Selection of the Object used for calculating the ChangeMatrix
             ChangeMatrixCalculator calculator = ChangeMatrixCalculator.getCalculator(jcuda);
             // Calculation of the ChangeMatrix
-            ChangeMatrixContainer container = calculator.computeChangeMatrix(geoserver, referenceCoverage.getRenderedImage(),
-                    nowCoverage.getRenderedImage(), classes, roiObj, rasterName, refYear, nowYear);
+            ChangeMatrixContainer container = calculator.computeChangeMatrix(geoserver,
+                    referenceCoverage.getRenderedImage(), nowCoverage.getRenderedImage(),
+                    areaImage, classes, roiObj, rasterName, refYear, nowYear);
 
             // Setting of the results
             result = container.getResult();
@@ -441,10 +458,9 @@ public class ChangeMatrixProcess implements GSProcess {
              */
             // hints for tiling
             final Hints hints = GeoTools.getDefaultHints().clone();
-            
+
             final GridCoverage2D retValue = new GridCoverageFactory(hints).create(rasterName,
                     result, referenceCoverage.getEnvelope());
-
             /**
              * Add Overviews...
              */
@@ -453,8 +469,10 @@ public class ChangeMatrixProcess implements GSProcess {
 
             // setting the write parameters for this geotiff
             final ParameterValueGroup gtiffParams = new GeoTiffFormat().getWriteParameters();
-            gtiffParams.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(CoverageImporter.DEFAULT_WRITE_PARAMS);
-            final GeneralParameterValue[] wps = (GeneralParameterValue[]) gtiffParams.values().toArray(new GeneralParameterValue[1]);
+            gtiffParams.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString())
+                    .setValue(CoverageImporter.DEFAULT_WRITE_PARAMS);
+            final GeneralParameterValue[] wps = (GeneralParameterValue[]) gtiffParams.values()
+                    .toArray(new GeneralParameterValue[1]);
 
             try {
                 writer.write(retValue, wps);
@@ -465,6 +483,9 @@ public class ChangeMatrixProcess implements GSProcess {
                     throw new IOException("Unable to write the output raster.", e);
                 }
             }
+
+            // Disposal of the input Raster
+            PlanarImage.wrapRenderedImage(result).dispose();
 
             AbstractGridCoverage2DReader gtiffReader = null;
             try {
@@ -480,14 +501,15 @@ public class ChangeMatrixProcess implements GSProcess {
             try {
                 ImportProcess importProcess = new ImportProcess(catalog);
                 GridCoverage2D retOvValue = gtiffReader.read(wps);
-                importProcess.execute(null, retOvValue, wsName, null, retValue.getName().toString(), retValue.getCoordinateReferenceSystem(), null, defaultStyle);
+                 importProcess.execute(null, retOvValue, wsName, null, retValue.getName().toString(), retValue.getCoordinateReferenceSystem(), null,
+                 defaultStyle);
             } finally {
                 if (gtiffReader != null) {
                     gtiffReader.dispose();
                 }
 
                 try {
-                    FileUtils.forceDelete(file);
+                     FileUtils.forceDelete(file);
                 } catch (Exception e) {
                     // we tried, no need to fuss around this one
                 }
@@ -501,12 +523,14 @@ public class ChangeMatrixProcess implements GSProcess {
              */
             filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
 
-            SimpleFeature feature = SimpleFeatureBuilder.copy(features.subCollection(filter).toArray(new SimpleFeature[1])[0]);
+            SimpleFeature feature = SimpleFeatureBuilder.copy(features.subCollection(filter)
+                    .toArray(new SimpleFeature[1])[0]);
 
             // build the feature
             feature.setAttribute("runEnd", new Date());
             feature.setAttribute("itemStatus", "COMPLETED");
-            feature.setAttribute("itemStatusMessage", "Change Matrix Process completed successfully");
+            feature.setAttribute("itemStatusMessage",
+                    "Change Matrix Process completed successfully");
             feature.setAttribute("layerName", rasterName);
             feature.setAttribute("changeMatrix", JSONSerializer.toJSON(changeMatrix).toString());
 
@@ -537,13 +561,16 @@ public class ChangeMatrixProcess implements GSProcess {
                 // build the feature
                 feature.setAttribute("runEnd", new Date());
                 feature.setAttribute("itemStatus", "FAILED");
-                feature.setAttribute("itemStatusMessage", "There was an error while while processing Input parameters: " + e.getMessage());
+                feature.setAttribute(
+                        "itemStatusMessage",
+                        "There was an error while while processing Input parameters: "
+                                + e.getMessage());
 
                 ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
                 output.add(feature);
 
                 features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter,
-                        false, new NullProgressListener());
+                false, new NullProgressListener());
             }
 
             throw new WPSException("Could process request ", e);
@@ -637,14 +664,15 @@ public class ChangeMatrixProcess implements GSProcess {
     }
 
     /**
-     * Enum used for calculating the ChangeMatrix 
+     * Enum used for calculating the ChangeMatrix
      */
     public enum ChangeMatrixCalculator {
         JAIEXT {
             @Override
             public ChangeMatrixContainer computeChangeMatrix(GeoServer geoserver,
-                    RenderedImage ref, RenderedImage cur, Set<Integer> usedClass, ROI roi,
-                    String rasterName, String refYear, String nowYear) {
+                    RenderedImage ref, RenderedImage cur, RenderedImage area,
+                    Set<Integer> usedClass, ROI roi, String rasterName, String refYear,
+                    String nowYear) {
                 // ParameterBlock object
                 final ParameterBlockJAI pbj = new ParameterBlockJAI("ChangeMatrix");
                 // ChangeMatrix Object
@@ -653,6 +681,9 @@ public class ChangeMatrixProcess implements GSProcess {
                 pbj.setParameter(
                         ChangeMatrixDescriptor.PARAM_NAMES[ChangeMatrixDescriptor.PIXEL_MULTY_ARG_INDEX],
                         PIXEL_MULTY_ARG_INDEX);
+                pbj.setParameter(
+                        ChangeMatrixDescriptor.PARAM_NAMES[ChangeMatrixDescriptor.AREA_MAP_INDEX],
+                        area);
                 // Setting of the ROI parameter for the JAI
                 if (roi != null) {
                     pbj.setParameter("ROI", roi);
@@ -701,6 +732,11 @@ public class ChangeMatrixProcess implements GSProcess {
                 // computation done!
                 cm.freeze();
 
+                // ImageDisposal
+                if(area instanceof RenderedOp){
+                    ((RenderedOp)area).dispose();
+                }
+
                 // Creation of the DTO
                 final ChangeMatrixDTO changeMatrix = new ChangeMatrixDTO(cm, usedClass, rasterName,
                         refYear, nowYear);
@@ -715,8 +751,9 @@ public class ChangeMatrixProcess implements GSProcess {
         JCUDA {
             @Override
             public ChangeMatrixContainer computeChangeMatrix(GeoServer geoserver,
-                    RenderedImage ref, RenderedImage cur, Set<Integer> usedClass, ROI roi,
-                    String rasterName, String refYear, String nowYear) {
+                    RenderedImage ref, RenderedImage cur, RenderedImage area,
+                    Set<Integer> usedClass, ROI roi, String rasterName, String refYear,
+                    String nowYear) {
 
                 // Selection of the Bounds of the input data
                 Rectangle rectIMG = new Rectangle(ref.getMinX(), ref.getMinY(), ref.getWidth(),
@@ -791,6 +828,7 @@ public class ChangeMatrixProcess implements GSProcess {
                             // Value
                             int index = i + j * TOTAL_CLASSES;
                             int classValue = changeMat[index];
+                            //TODO AREA MUST BE CALCULATED FOR JCUDA
                             ChangeMatrixElement el = new ChangeMatrixElement(i, j, classValue);
                             changeMatrix.add(el);
                         }
@@ -1043,16 +1081,17 @@ public class ChangeMatrixProcess implements GSProcess {
          * @param geoserver
          * @param ref
          * @param cur
+         * @param area
          * @param usedClass
          * @param roi
          * @param rasterName
-         * @param nowYear 
-         * @param refYear 
+         * @param nowYear
+         * @param refYear
          * @return
          */
         public abstract ChangeMatrixContainer computeChangeMatrix(GeoServer geoserver,
-                RenderedImage ref, RenderedImage cur, Set<Integer> usedClass, ROI roi,
-                String rasterName, String refYear, String nowYear);
+                RenderedImage ref, RenderedImage cur, RenderedImage area, Set<Integer> usedClass,
+                ROI roi, String rasterName, String refYear, String nowYear);
 
         /**
          * Returns a calculator for JCUDA or the JAI operation

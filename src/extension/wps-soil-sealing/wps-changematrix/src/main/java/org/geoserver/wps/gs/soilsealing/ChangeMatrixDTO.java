@@ -47,12 +47,13 @@ public class ChangeMatrixDTO {
         for (Integer elRef : classes) {
             for (Integer elNow : classes) {
                 final ChangeMatrixElement cme = new ChangeMatrixElement(elRef, elNow,
-                        cm.retrievePairOccurrences(elRef, elNow)*value);
+                        cm.retrievePairOccurrences(elRef, elNow) * value, cm.retrieveTotalArea(
+                                elRef, elNow));
                 add(cme);
             }
         }
     }
-    
+
     /**
      * Init the changeMatrix as an empty TreeSet
      * 
