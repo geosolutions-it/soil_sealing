@@ -41,27 +41,67 @@
 			<groupId>it.geosolutions-jai-ext</groupId>
 			<artifactId>change-matrix</artifactId>
 			<version>${jaiext.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.jaitools</groupId>
+					<artifactId>jt-utils</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>it.geosolutions.jaiext.zonal</groupId>
 			<artifactId>jt-zonal</artifactId>
 			<version>${jaiext.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.jaitools</groupId>
+					<artifactId>jt-utils</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>it.geosolutions.jaiext.bandmerge</groupId>
 			<artifactId>jt-bandmerge</artifactId>
 			<version>${jaiext.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.jaitools</groupId>
+					<artifactId>jt-utils</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>it.geosolutions.jaiext.buffer</groupId>
 			<artifactId>jt-buffer</artifactId>
 			<version>${jaiext.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.jaitools</groupId>
+					<artifactId>jt-utils</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>it.geosolutions.jaiext.algebra</groupId>
 			<artifactId>jt-algebra</artifactId>
 			<version>${jaiext.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.jaitools</groupId>
+					<artifactId>jt-utils</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
+			 <dependency>
+	        <groupId>org.jaitools</groupId>
+	        <artifactId>jt-utils</artifactId>
+	        <version>${jt.version}</version>
+      </dependency>
+      <dependency>
+	        <groupId>org.jaitools</groupId>
+	        <artifactId>jt-vectorbinarize</artifactId>
+	        <version>${jt.version}</version>
+      </dependency> 
 
 		<!-- test dependencies -->
 		<dependency>

@@ -63,7 +63,18 @@
 		<dependency>
 			<groupId>it.geosolutions.jaiext.bandmerge</groupId>
 			<artifactId>jt-bandmerge</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>org.jaitools</groupId>
+					<artifactId>jt-utils</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
+		<dependency>
+	        <groupId>org.jaitools</groupId>
+	        <artifactId>jt-utils</artifactId>
+	        <version>${jt.version}</version>
+        </dependency>
 
 		<dependency>
 			<groupId>org.geoserver</groupId>

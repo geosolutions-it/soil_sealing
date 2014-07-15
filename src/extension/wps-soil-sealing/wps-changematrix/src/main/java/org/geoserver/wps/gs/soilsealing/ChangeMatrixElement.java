@@ -28,14 +28,30 @@ public class ChangeMatrixElement implements Comparable<ChangeMatrixElement> {
     private double pixels;
 
     /**
+     * The total area of the pixel that has been changed from class ref to class now
+     */
+    private double area;
+
+    /**
      * @param ref
      * @param now
      * @param pixels
      */
     public ChangeMatrixElement(int ref, int now, double pixels) {
+        this(ref, now, pixels, 0);
+    }
+
+    /**
+     * @param ref
+     * @param now
+     * @param pixels
+     * @param area
+     */
+    public ChangeMatrixElement(int ref, int now, double pixels, double area) {
         this.ref = ref;
         this.now = now;
         this.pixels = pixels;
+        this.area = area;
     }
 
     /**
@@ -60,6 +76,13 @@ public class ChangeMatrixElement implements Comparable<ChangeMatrixElement> {
     }
 
     /**
+     * @return the total area
+     */
+    public double getArea() {
+        return area;
+    }
+
+    /**
      * @param ref the ref to set
      */
     public void setRef(int ref) {
@@ -80,6 +103,13 @@ public class ChangeMatrixElement implements Comparable<ChangeMatrixElement> {
         this.pixels = pixels;
     }
 
+    /**
+     * @param area the total area to set
+     */
+    public void setArea(int area) {
+        this.area = area;
+    }
+
     /*
      * (non-Javadoc)
      * 
@@ -87,8 +117,11 @@ public class ChangeMatrixElement implements Comparable<ChangeMatrixElement> {
      */
     @Override
     public int compareTo(ChangeMatrixElement o) {
+        double area1 = this.getArea();
+        double area2 = o.getArea();
+        double perc = (area1 - area2)/area1;
         if (o.getRef() == this.getRef() && o.getNow() == this.getNow()
-                && o.getPixels() == this.getPixels()) {
+                && o.getPixels() == this.getPixels() && perc < 0.01) {
             return 0;
         }
         return 1;
