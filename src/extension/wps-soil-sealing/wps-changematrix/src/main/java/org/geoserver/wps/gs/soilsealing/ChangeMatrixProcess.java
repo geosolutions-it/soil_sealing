@@ -873,8 +873,8 @@ public class ChangeMatrixProcess implements GSProcess {
 
                 Graphics2D gc2d = null;
                 // Translation parameters in order to position the ROI data correctly in the Raster Space
-                int trX = rectROI.x - rectIMG.x;
-                int trY = rectROI.y - rectIMG.y;
+                int trX = -rectIMG.x + rectROI.x - rectIMG.x;
+                int trY = -rectIMG.y + rectROI.y - rectIMG.y;
                 try {
                     gc2d = test.createGraphics();
                     gc2d.drawRenderedImage(transformed,
@@ -882,8 +882,8 @@ public class ChangeMatrixProcess implements GSProcess {
                 } finally {
                     gc2d.dispose();
                 }
-
-                DataBufferByte dbRoi = (DataBufferByte) test.getData(rectIMG).getDataBuffer();
+                Rectangle testRect = new Rectangle(rectIMG.width, rectIMG.height);
+                DataBufferByte dbRoi = (DataBufferByte) test.getData(testRect).getDataBuffer();
                 dataROI = dbRoi.getData();
                 // BufferedImage is stored in memory so the planarImage chain before can be disposed
                 ImageUtilities.disposePlanarImageChain(transformed);
