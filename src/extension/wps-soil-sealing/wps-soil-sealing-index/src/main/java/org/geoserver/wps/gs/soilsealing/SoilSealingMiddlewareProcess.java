@@ -111,9 +111,11 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
                 int currentPopulation = 0;
                 switch (sAu.getType()) {
                 case MUNICIPALITY :
-                    populateInputLists(nowFilter, referenceYear, currentYear,
+                    boolean hasPop = populateInputLists(nowFilter, referenceYear, currentYear,
                             gridToWorldCorner, referenceCrs, rois, populations, sAu, toRasterSpace);
-                    municipalities.add(sAu.getName() + " - " + sAu.getParent());
+                    if(hasPop){
+                    	municipalities.add(sAu.getName() + " - " + sAu.getParent());
+                    }
                     break;
                 case DISTRICT:
                     for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
@@ -159,22 +161,31 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
             } else if (admUnitSelectionType == AuSelectionType.AU_SUBS) {
                 switch (sAu.getType()) {
                 case MUNICIPALITY :
-                    populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, sAu, toRasterSpace);
-                    municipalities.add(sAu.getName() + " - " + sAu.getParent());
+                    boolean hasPop = populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, sAu, toRasterSpace);
+                    if(hasPop){
+                    	municipalities.add(sAu.getName() + " - " + sAu.getParent());
+                    }
+                    //municipalities.add(sAu.getName() + " - " + sAu.getParent());
                     break;
                 case DISTRICT:
                     for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
                     {
-                        populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, ssAu, toRasterSpace);
-                        municipalities.add(ssAu.getName() + " - " + ssAu.getParent());
+                        hasPop = populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, ssAu, toRasterSpace);
+                        if(hasPop){
+                        	municipalities.add(ssAu.getName() + " - " + ssAu.getParent());
+                        }
+                        //municipalities.add(ssAu.getName() + " - " + ssAu.getParent());
                     }
                     break;
                 case REGION:
                     for(SoilSealingAdministrativeUnit ssAu : sAu.getSubs())
                     {
                         for(SoilSealingAdministrativeUnit sssAu : ssAu.getSubs()) {
-                            populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, sssAu, toRasterSpace);
-                            municipalities.add(sssAu.getName() + " - " + sssAu.getParent());
+                            hasPop = populateInputLists(nowFilter, referenceYear, currentYear, gridToWorldCorner, referenceCrs, rois, populations, sssAu, toRasterSpace);
+                            if(hasPop){
+                            	municipalities.add(sssAu.getName() + " - " + sssAu.getParent());
+                            }
+                            //municipalities.add(sssAu.getName() + " - " + sssAu.getParent());
                         }
                     }
                     break;
@@ -221,18 +232,24 @@ public abstract class SoilSealingMiddlewareProcess implements GSProcess {
      * @throws TransformException
      * @throws NoninvertibleTransformException
      */
-    protected void populateInputLists(Filter nowFilter, final String referenceYear,
+    protected boolean populateInputLists(Filter nowFilter, final String referenceYear,
             final String currentYear, final AffineTransform gridToWorldCorner,
             final CoordinateReferenceSystem referenceCrs, List<Geometry> rois,
             List<List<Integer>> populations, SoilSealingAdministrativeUnit sAu, 
             boolean toRasterSpace)
             throws NoSuchAuthorityCodeException, FactoryException, TransformException,
             NoninvertibleTransformException {
-        rois.add(toReferenceCRS(sAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace));
+        boolean hasPop = true;
         if (sAu.getPopulation() != null) {
-            if (sAu.getPopulation().get(referenceYear) != null) populations.get(0).add(sAu.getPopulation().get(referenceYear));
-            if (nowFilter != null && sAu.getPopulation().get(currentYear) != null) populations.get(1).add(sAu.getPopulation().get(currentYear));
+            if (sAu.getPopulation().get(referenceYear) != null) {populations.get(0).add(sAu.getPopulation().get(referenceYear));}
+            else{hasPop = false;};
+            if (nowFilter != null && sAu.getPopulation().get(currentYear) != null){ populations.get(1).add(sAu.getPopulation().get(currentYear));}
+            else if(nowFilter != null){hasPop = false;}
         }
+        if(hasPop){
+        	rois.add(toReferenceCRS(sAu.getTheGeom(), referenceCrs, gridToWorldCorner, toRasterSpace));
+        }
+        return hasPop;
     }
 
     /**
