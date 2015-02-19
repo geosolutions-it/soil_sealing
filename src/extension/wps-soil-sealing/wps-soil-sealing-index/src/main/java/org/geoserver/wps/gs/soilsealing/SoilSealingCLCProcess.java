@@ -257,10 +257,13 @@ public class SoilSealingCLCProcess extends SoilSealingMiddlewareProcess {
 
                 // Selection of the CLC level
                 int indexValue = referenceName.indexOf("_L");
+                
+                int clcLevel = 3;
+                if(indexValue > 0){
+                    String substring = referenceName.substring(indexValue + 2, indexValue + 3);
 
-                String substring = referenceName.substring(indexValue + 2, indexValue + 3);
-
-                int clcLevel = Integer.parseInt(substring);
+                    clcLevel = Integer.parseInt(substring);
+                }
 
                 switch (clcLevel) {
                 case 1:
