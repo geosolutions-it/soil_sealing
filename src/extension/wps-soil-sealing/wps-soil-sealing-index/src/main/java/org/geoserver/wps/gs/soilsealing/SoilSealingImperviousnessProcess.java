@@ -51,7 +51,6 @@ import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.resources.image.ImageUtilities;
-import org.geotools.util.NullProgressListener;
 import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridCoverageReader;
 import org.opengis.feature.simple.SimpleFeature;
@@ -116,7 +115,8 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             @DescribeParameter(name = "geocoderPopulationLayer", min = 1, description = "Name of the geocoder population layer, optionally fully qualified (workspace:name)") String geocoderPopulationLayer,
             @DescribeParameter(name = "imperviousnessLayer", min = 1, description = "Name of the imperviousness layer, optionally fully qualified (workspace:name)") String imperviousnessLayer,
             @DescribeParameter(name = "admUnits", min = 1, description = "Comma Separated list of Administrative Units") String admUnits,
-            @DescribeParameter(name = "admUnitSelectionType", min = 1, description = "Administrative Units Slection Type") AuSelectionType admUnitSelectionType)
+            @DescribeParameter(name = "admUnitSelectionType", min = 1, description = "Administrative Units Slection Type") AuSelectionType admUnitSelectionType,
+            @DescribeParameter(name = "jcuda", min = 0, description = "Boolean value indicating if indexes must be calculated using CUDA", defaultValue = "false") Boolean jcuda)
             throws IOException {
         // ///////////////////////////////////////////////
         // Sanity checks ...
@@ -290,22 +290,39 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
              * LOG into the DB
              */
             filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
-            features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true, new NullProgressListener());
+            //features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true, new NullProgressListener());
 
-            if (features == null || features.isEmpty()) {
-                throw new ProcessException(
-                        "There was an error while logging FeatureType into the storage.");
-            }
+            //if (features == null || features.isEmpty()) {
+                //throw new ProcessException(
+                        //"There was an error while logging FeatureType into the storage.");
+            //}
 
             // ///////////////////////////////////////////////////////////////
             // Calling UrbanGridProcess
             // ///////////////////////////////////////////////////////////////
-            final UrbanGridProcess urbanGridProcess = new UrbanGridProcess(imperviousnessReference,
-                    referenceYear, currentYear);
+            List<StatisticContainer> indexValue = null;
+            // CUDA PROCESS
+            //TODO WORK FROM HERE
+            //TODO WORK FROM HERE
+            //TODO WORK FROM HERE
+            //TODO WORK FROM HERE
+            //TODO WORK FROM HERE
+            //TODO WORK FROM HERE
+            //TODO WORK FROM HERE
+            if (true) {
+                final UrbanGridCUDAProcess urbanGridProcess = new UrbanGridCUDAProcess(
+                        imperviousnessReference, referenceYear, currentYear);
 
-            List<StatisticContainer> indexValue = urbanGridProcess.execute(referenceCoverage,
-                    nowCoverage, index, subIndex, null, rois, populations,
-                    (index == 10 ? INDEX_10_VALUE : null));
+                indexValue = urbanGridProcess.execute(referenceCoverage, nowCoverage, index,
+                        subIndex, null, rois, populations, (index == 10 ? INDEX_10_VALUE : null));
+            } else {
+                final UrbanGridProcess urbanGridProcess = new UrbanGridProcess(
+                        imperviousnessReference, referenceYear, currentYear);
+
+                indexValue = urbanGridProcess.execute(referenceCoverage, nowCoverage, index,
+                        subIndex, null, rois, populations, (index == 10 ? INDEX_10_VALUE : null));
+            }
+
 
             // ///////////////////////////////////////////////////////////////
             // Preparing the Output Object which will be JSON encoded
@@ -372,7 +389,7 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
             output.add(feature);
 
-            features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
+            //features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
             
             // //////////////////////////////////////////////////////////////////////
             // Return the computed Soil Sealing Index ...
@@ -399,7 +416,7 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
                 ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
                 output.add(feature);
 
-                features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
+                //features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
             }
             
             throw new WPSException("Could process request ", e);
