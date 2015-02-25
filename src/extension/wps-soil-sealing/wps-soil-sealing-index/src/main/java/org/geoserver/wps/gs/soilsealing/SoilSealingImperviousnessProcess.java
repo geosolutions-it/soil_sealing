@@ -51,6 +51,7 @@ import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.resources.image.ImageUtilities;
+import org.geotools.util.NullProgressListener;
 import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridCoverageReader;
 import org.opengis.feature.simple.SimpleFeature;
@@ -290,12 +291,12 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
              * LOG into the DB
              */
             filter = ff.equals(ff.property("ftUUID"), ff.literal(uuid.toString()));
-            //features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true, new NullProgressListener());
+            features = wfsLogProcess.execute(features, typeName, wsName, storeName, filter, true, new NullProgressListener());
 
-            //if (features == null || features.isEmpty()) {
-                //throw new ProcessException(
-                        //"There was an error while logging FeatureType into the storage.");
-            //}
+            if (features == null || features.isEmpty()) {
+                throw new ProcessException(
+                        "There was an error while logging FeatureType into the storage.");
+            }
 
             // ///////////////////////////////////////////////////////////////
             // Calling UrbanGridProcess
@@ -389,7 +390,7 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
             ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
             output.add(feature);
 
-            //features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
+            features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
             
             // //////////////////////////////////////////////////////////////////////
             // Return the computed Soil Sealing Index ...
@@ -416,7 +417,7 @@ public class SoilSealingImperviousnessProcess extends SoilSealingMiddlewareProce
                 ListFeatureCollection output = new ListFeatureCollection(features.getSchema());
                 output.add(feature);
 
-                //features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
+                features = wfsLogProcess.execute(output, typeName, wsName, storeName, filter, false, new NullProgressListener());
             }
             
             throw new WPSException("Could process request ", e);
