@@ -287,7 +287,7 @@ public class UrbanGridProcess implements GSProcess {
      * @param now current coverage results array
      * @return
      */
-    private List<StatisticContainer> accumulateResults(List<Geometry> rois, double[] reference,
+    protected List<StatisticContainer> accumulateResults(List<Geometry> rois, double[] reference,
             double[] now) {
         // Geometries number
         int numGeo = rois.size();
